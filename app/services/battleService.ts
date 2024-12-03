@@ -1,5 +1,5 @@
-import { BrowserProvider } from 'ethers';
-import { Faction, GameState, BearState } from '../types/game';
+import { BrowserProvider, Contract } from 'ethers';
+import { Faction, GameState } from '../types/game';
 
 const BATTLE_CONTRACT_ADDRESS = '0x20aCfa11998c23896A61E467cB0F605C2d46C7B7';
 
@@ -60,7 +60,6 @@ export const battleService = {
             
             return result;
         } catch (error: any) {
-            // Detailed error logging
             console.error('Battle service detailed error:', {
                 errorMessage: error.message,
                 errorCode: error.code,
@@ -70,15 +69,6 @@ export const battleService = {
                 defenderId,
                 contractAddress: BATTLE_CONTRACT_ADDRESS
             });
-
-            // Check for specific error types
-            if (error.code === 'CALL_EXCEPTION') {
-                console.log('Contract call failed - using fallback');
-            } else if (error.code === 'NETWORK_ERROR') {
-                console.log('Network error - using fallback');
-            } else if (error.code === 'UNPREDICTABLE_GAS_LIMIT') {
-                console.log('Gas estimation failed - using fallback');
-            }
             
             // Fallback battle resolution
             const fallbackResult = Math.random() > 0.5;
@@ -90,11 +80,9 @@ export const battleService = {
     handleBattleLoss(gameState: GameState, bearTokenId: string): GameState {
         const now = Date.now();
         const updatedCooldowns = gameState.cooldowns.filter(bear => 
-            // Remove expired cooldowns
             bear.cooldownUntil === null || bear.cooldownUntil > now
         );
 
-        // Add new cooldown for the losing bear
         updatedCooldowns.push({
             tokenId: bearTokenId,
             cooldownUntil: now + COOLDOWN_DURATION
