@@ -47,6 +47,7 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
 
     useEffect(() => {
         const fetchGameState = async () => {
+            setIsLoading(true);
             try {
                 const { data: currentGame, error: fetchError } = await supabase
                     .from('games')
@@ -80,6 +81,8 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                 }
             } catch (error) {
                 console.error('Unexpected error:', error);
+            } finally {
+                setIsLoading(false);
             }
         };
 
@@ -126,8 +129,8 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
     // Add loading state check
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
             </div>
         );
     }
@@ -135,7 +138,7 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
     // Add null check for gameState
     if (!gameState) {
         return (
-            <div className="flex items-center justify-center h-screen">
+            <div className="flex items-center justify-center min-h-[400px]">
                 <div className="text-red-500">Error loading game state</div>
             </div>
         );
