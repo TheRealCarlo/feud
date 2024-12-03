@@ -37,18 +37,20 @@ export interface Square {
     faction: Faction | null;
 }
 
-export type GameState = {
-    id: string;
+export interface GameState {
+    id?: number;
     squares: Square[];
-    end_time: number;
-    used_bears: string[];
     is_active: boolean;
+    created_at?: string;
+    activePlayers?: number;
+    totalBattles?: number;
+    used_bears?: string[];
+    end_time: number;
     cooldowns: Array<{
         tokenId: string;
         timestamp: number;
     }>;
-    created_at?: string;
-};
+}
 
 export interface BearState {
     tokenId: string;

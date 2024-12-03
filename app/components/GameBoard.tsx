@@ -287,10 +287,10 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                     </div>
                 </div>
 
-                {/* Game Stats or Info (Optional) */}
+                {/* Game Stats */}
                 <div className="mt-6 flex justify-between items-center text-gray-400 text-sm">
-                    <div>Active Players: {gameState?.activePlayers || 0}</div>
-                    <div>Total Battles: {gameState?.totalBattles || 0}</div>
+                    <div>Players Online: {gameState?.activePlayers ?? 0}</div>
+                    <div>Total Moves: {gameState?.totalBattles ?? 0}</div>
                 </div>
             </div>
 
