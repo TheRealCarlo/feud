@@ -22,30 +22,39 @@ export const supabase = createClient(
     }
 )
 
-// Test the connection
-supabase
-    .from('games')
-    .select('*')
-    .limit(1)
-    .then(response => {
-        if (response.error) {
+// Test the connection using async/await
+const testConnection = async () => {
+    try {
+        const { data, error } = await supabase
+            .from('games')
+            .select('*')
+            .limit(1);
+
+        if (error) {
             console.error('Supabase connection test failed:', {
-                message: response.error.message,
-                details: response.error.details,
-                hint: response.error.hint,
-                code: response.error.code
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code
             });
         } else {
-            console.log('Supabase connection test succeeded:', response.data);
+            console.log('Supabase connection test succeeded:', data);
         }
-    })
-    .catch(err => {
-        console.error('Raw query error:', {
-            name: err.name,
-            message: err.message,
-            stack: err.stack
-        });
-    });
+    } catch (err) {
+        if (err instanceof Error) {
+            console.error('Raw query error:', {
+                name: err.name,
+                message: err.message,
+                stack: err.stack
+            });
+        } else {
+            console.error('Unknown error:', err);
+        }
+    }
+};
+
+// Run the test
+testConnection();
 
 // Test if we can list all tables
 supabase
