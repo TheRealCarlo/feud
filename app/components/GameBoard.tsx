@@ -122,6 +122,13 @@ export function GameBoard({ userFaction, nfts, onGameStart }: GameBoardProps) {
                     alert('Please install MetaMask to participate in battles!');
                     return;
                 }
+
+                // Check if target square has a bear
+                if (!targetSquare.bear) {
+                    console.error('No bear found in target square');
+                    return;
+                }
+
                 const provider = new BrowserProvider(ethereum);
                 
                 const battleWon = await battleService.initiateBattle(
