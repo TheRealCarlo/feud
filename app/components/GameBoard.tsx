@@ -4,6 +4,7 @@ import { BearSelector } from './BearSelector';
 import { Faction, GameState } from '../types/game';
 import { gameService } from '../services/gameService';
 import { battleService } from '../services/battleService';
+import { supabase } from '../lib/supabase'
 
 interface GameBoardProps {
     userFaction: Faction;
@@ -34,160 +35,184 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
     const [isBattling, setIsBattling] = useState(false);
 
     useEffect(() => {
-        // Load or start game
-        let currentGame = gameService.getGameState();
-        if (!currentGame) {
-            currentGame = gameService.startNewGame();
-            onGameStart();
-        }
-        setGameState(currentGame);
+        const fetchGameState = async () => {
+            console.log('Fetching game state...');
+            try {
+                const { data: currentGame, error: fetchError } = await supabase
+                    .from('games')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (fetchError) {
+                    console.error('Error fetching game:', {
+                        message: fetchError.message,
+                        details: fetchError.details,
+                        hint: fetchError.hint,
+                        code: fetchError.code
+                    });
+                    return;
+                }
+
+                console.log('Current game:', currentGame);
+
+                if (!currentGame) {
+                    console.log('Creating new game...');
+                    const initialSquares = Array(64).fill(null).map((_, index) => ({
+                        id: index,
+                        bear: null,
+                        faction: null
+                    }));
+
+                    const { data: newGame, error: createError } = await supabase
+                        .from('games')
+                        .insert([{
+                            squares: initialSquares,
+                            end_time: Date.now() + (24 * 60 * 60 * 1000),
+                            used_bears: [],
+                            is_active: true
+                        }])
+                        .select()
+                        .single();
+
+                    if (createError) {
+                        console.error('Error creating game:', createError);
+                        return;
+                    }
+
+                    console.log('New game created:', newGame);
+                    setGameState(newGame);
+                    onGameStart();
+                } else {
+                    console.log('Using existing game:', currentGame);
+                    setGameState(currentGame);
+                }
+            } catch (error) {
+                console.error('Unexpected error:', error);
+            }
+        };
+
+        fetchGameState();
+
+        // Timer update
+        const timerInterval = setInterval(() => {
+            setGameState(prevState => {
+                if (!prevState) return null;
+                const timeLeft = prevState.end_time - Date.now();
+                const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+                return prevState;
+            });
+        }, 1000);
+
+        // Subscription for real-time updates
+        const subscription = supabase
+            .channel('game_updates')
+            .on('postgres_changes', 
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'games'
+                },
+                (payload) => {
+                    console.log('Received game update:', payload);
+                    setGameState(payload.new);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            clearInterval(timerInterval);
+            subscription.unsubscribe();
+        };
     }, []);
 
     useEffect(() => {
-        if (!gameState) return;
-
-        const interval = setInterval(() => {
-            const now = Date.now();
-            const remaining = gameState.endTime - now;
-            
-            if (remaining <= 0) {
-                const battleResult = gameService.endGame(gameState);
-                gameService.saveBattleResult(battleResult);
-                setGameState(null);
-                clearInterval(interval);
-            } else {
-                const hours = Math.floor(remaining / (1000 * 60 * 60));
-                const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-                setTimeLeft(`${hours}h ${minutes}m`);
-            }
-        }, 1000);
-
-        return () => clearInterval(interval);
+        if (gameState) {
+            console.log('Game State:', {
+                squareCount: gameState.squares.length,
+                firstSquare: gameState.squares[0],
+                lastSquare: gameState.squares[63],
+                allSquares: gameState.squares
+            });
+        }
     }, [gameState]);
 
-    const handleBattle = async (squareId: number) => {
-        const ethereum = window.ethereum;
-        if (!gameState || !ethereum) {
-            alert('Please install MetaMask to participate in battles!');
-            return;
-        }
-
-        const square = gameState.squares[squareId];
-        if (!square.bear) return;
-
-        setIsBattling(true);
+    const refreshGameState = async () => {
+        console.log('Refreshing game state...');
         try {
-            const provider = new BrowserProvider(ethereum);
-            
-            // Find the selected bear for the attack
-            setSelectedSquareId(squareId);
-            setShowBearSelector(true);
+            const { data: currentGame, error } = await supabase
+                .from('games')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
 
-        } catch (error) {
-            console.error('Battle error:', error);
-            alert('Failed to initiate battle. Please try again.');
-        } finally {
-            setIsBattling(false);
-        }
-    };
+            if (error) {
+                console.error('Error refreshing game state:', error);
+                return;
+            }
 
-    const handleSquareClick = (id: number) => {
-        if (!gameState) return;
-        
-        const square = gameState.squares[id];
-        
-        // If square belongs to user's faction, do nothing
-        if (square.faction === userFaction) return;
-        
-        // If square is occupied by another faction, initiate battle
-        if (square.faction && square.faction !== userFaction) {
-            handleBattle(id);
-            return;
+            console.log('Refreshed game state:', currentGame);
+            setGameState(currentGame);
+        } catch (err) {
+            console.error('Error during refresh:', err);
         }
-        
-        // If square is empty, allow placement
-        setSelectedSquareId(id);
-        setShowBearSelector(true);
     };
 
     const handleBearSelect = async (bear: any) => {
         if (!gameState || selectedSquareId === null) return;
 
-        // Check if this is a battle
-        const targetSquare = gameState.squares[selectedSquareId];
-        if (targetSquare.faction && targetSquare.faction !== userFaction) {
-            try {
-                setIsBattling(true);
-                const ethereum = window.ethereum;
-                if (!ethereum) {
-                    alert('Please install MetaMask to participate in battles!');
-                    return;
-                }
+        console.log('Placing bear:', {
+            bear,
+            squareId: selectedSquareId,
+            currentState: gameState
+        });
 
-                // Check if target square has a bear
-                if (!targetSquare.bear) {
-                    console.error('No bear found in target square');
-                    return;
-                }
+        // Create updated squares array
+        const updatedSquares = [...gameState.squares];
+        updatedSquares[selectedSquareId] = {
+            ...updatedSquares[selectedSquareId],
+            bear: bear,
+            faction: userFaction
+        };
 
-                const provider = new BrowserProvider(ethereum);
-                
-                const battleWon = await battleService.initiateBattle(
-                    provider,
-                    bear.tokenId,
-                    targetSquare.bear.tokenId
-                );
+        console.log('Updated squares:', updatedSquares);
 
-                if (battleWon) {
-                    // Update square with attacking bear
-                    const newGameState = {
-                        ...gameState,
-                        squares: gameState.squares.map((square, index) => 
-                            index === selectedSquareId
-                                ? { ...square, bear, faction: userFaction }
-                                : square
-                        ),
-                        usedBears: [...gameState.usedBears, bear.tokenId]
-                    };
-                    gameService.updateGameState(newGameState);
-                    setGameState(newGameState);
-                    alert('Battle won! Square captured!');
-                } else {
-                    // Handle battle loss and cooldown
-                    const updatedGameState = battleService.handleBattleLoss(gameState, bear.tokenId);
-                    gameService.updateGameState(updatedGameState);
-                    setGameState(updatedGameState);
-                    alert('Battle lost! Your bear needs to rest for 2 hours.');
-                }
-            } catch (error) {
-                console.error('Battle error:', error);
-                alert('Battle failed. Please try again.');
-            } finally {
-                setIsBattling(false);
-            }
-        } else {
-            // Normal placement logic
-            if (gameService.isBearUsed(bear.tokenId)) {
-                alert('This bear has already been placed on the board!');
+        try {
+            const { error } = await supabase
+                .from('games')
+                .update({
+                    squares: updatedSquares,
+                    used_bears: Array.isArray(gameState.used_bears) 
+                        ? [...gameState.used_bears, bear.tokenId]
+                        : [bear.tokenId]
+                })
+                .eq('id', gameState.id);
+
+            if (error) {
+                console.error('Failed to update game state:', error);
+                alert('Failed to place bear. Please try again.');
                 return;
             }
 
-            const newGameState = {
-                ...gameState,
-                squares: gameState.squares.map((square, index) => 
-                    index === selectedSquareId
-                        ? { ...square, bear, faction: userFaction }
-                        : square
-                ),
-                usedBears: [...gameState.usedBears, bear.tokenId]
-            };
-
-            gameService.updateGameState(newGameState);
-            setGameState(newGameState);
+            // Refresh the game state after update
+            await refreshGameState();
+            
+            setShowBearSelector(false);
+            setSelectedSquareId(null);
+        } catch (err) {
+            console.error('Error updating game:', err);
+            alert('Failed to place bear. Please try again.');
         }
+    };
 
-        setShowBearSelector(false);
-        setSelectedSquareId(null);
+    const handleSquareClick = (squareId: number) => {
+        setSelectedSquareId(squareId);
+        setShowBearSelector(true);
     };
 
     if (!gameState) {
@@ -210,33 +235,36 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
 
             {/* Game Board */}
             <div className="grid grid-cols-8 gap-1 p-4 bg-gray-800 rounded-lg shadow-lg">
-                {gameState.squares.map((square) => (
-                    <div
-                        key={square.id}
-                        onClick={() => handleSquareClick(square.id)}
-                        className={`
-                            w-16 h-16 bg-gray-700 rounded-sm cursor-pointer
-                            hover:bg-gray-600 transition-all duration-200
-                            border-2 ${square.faction ? getFactionColor(square.faction) : 'border-transparent'}
-                            ${selectedSquareId === square.id ? 'ring-2 ring-yellow-400' : ''}
-                            ${isBattling && selectedSquareId === square.id ? 'animate-pulse' : ''}
-                            relative overflow-hidden
-                        `}
-                    >
-                        {square.bear && (
-                            <div className="w-full h-full">
-                                <img 
-                                    src={square.bear.metadata.image}
-                                    alt={square.bear.metadata.name}
-                                    className="w-full h-full object-cover rounded-sm"
-                                />
-                                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 truncate">
-                                    {square.bear.metadata.name}
+                {Array.from({ length: 64 }).map((_, index) => {
+                    const square = gameState.squares[index] || { id: index, bear: null, faction: null };
+                    return (
+                        <div
+                            key={index}
+                            onClick={() => handleSquareClick(index)}
+                            className={`
+                                w-16 h-16 bg-gray-700 rounded-sm cursor-pointer
+                                hover:bg-gray-600 transition-all duration-200
+                                border-2 ${square.faction ? getFactionColor(square.faction) : 'border-transparent'}
+                                ${selectedSquareId === index ? 'ring-2 ring-yellow-400' : ''}
+                                ${isBattling && selectedSquareId === index ? 'animate-pulse' : ''}
+                                relative overflow-hidden
+                            `}
+                        >
+                            {square.bear && (
+                                <div className="w-full h-full">
+                                    <img 
+                                        src={square.bear.metadata.image}
+                                        alt={square.bear.metadata.name}
+                                        className="w-full h-full object-cover rounded-sm"
+                                    />
+                                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 truncate">
+                                        {square.bear.metadata.name}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
+                            )}
+                        </div>
+                    );
+                })}
             </div>
 
             {/* Game Stats */}
@@ -257,7 +285,9 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
 
             {showBearSelector && (
                 <BearSelector
-                    nfts={nfts.filter(bear => !gameState.usedBears.includes(bear.tokenId))}
+                    nfts={nfts.filter(bear => 
+                        !gameState?.used_bears?.includes(bear.tokenId)
+                    )}
                     onSelect={handleBearSelect}
                     onClose={() => {
                         setShowBearSelector(false);

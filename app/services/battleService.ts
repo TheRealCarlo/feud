@@ -114,15 +114,14 @@ export const battleService = {
     },
 
     getBearCooldown(gameState: GameState, bearTokenId: string): number | null {
+        if (!gameState.cooldowns) return null;
+        
         const bearCooldown = gameState.cooldowns.find(bear => bear.tokenId === bearTokenId);
         if (!bearCooldown) return null;
 
         const now = Date.now();
-        if (bearCooldown.cooldownUntil && bearCooldown.cooldownUntil > now) {
-            return bearCooldown.cooldownUntil;
-        }
-
-        return null;
+        const timeLeft = bearCooldown.timestamp - now;
+        return timeLeft > 0 ? timeLeft : null;
     },
 
     formatCooldownTime(cooldownUntil: number): string {

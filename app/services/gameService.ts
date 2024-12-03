@@ -137,5 +137,25 @@ export const gameService = {
         const history = gameService.getBattleHistory();
         history.push(result);
         localStorage.setItem(BATTLE_HISTORY_KEY, JSON.stringify(history));
-    }
+    },
+
+    createInitialSquares: (): Square[] => {
+        const squares = [];
+        for (let i = 0; i < 64; i++) {
+            squares.push({
+                id: i,
+                faction: null,
+                bear: null
+            });
+        }
+        return squares;
+    },
+
+    createInitialGameState: () => ({
+        squares: gameService.createInitialSquares(),
+        end_time: Date.now() + (24 * 60 * 60 * 1000),
+        used_bears: [],
+        is_active: true,
+        cooldowns: [] // Initialize empty cooldowns array
+    })
 }; 
