@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { gameService } from '../services/gameService';
-import { Battle } from '../types/game';
+import { Battle, Faction } from '../types/game';
 
-export default function BattleHistory() {
+interface BattleHistoryProps {
+    userFaction: Faction;
+}
+
+export default function BattleHistory({ userFaction }: BattleHistoryProps) {
     const [battles, setBattles] = useState<Battle[]>([]);
 
     useEffect(() => {
@@ -20,7 +24,7 @@ export default function BattleHistory() {
 
     return (
         <div className="space-y-4">
-            {battles.map((battle, index) => (
+            {battles.map((battle) => (
                 <div 
                     key={battle.timestamp} 
                     className="bg-gray-800 p-4 rounded-lg shadow"
@@ -28,6 +32,24 @@ export default function BattleHistory() {
                     <div className="flex justify-between text-sm text-gray-400">
                         <span>
                             {new Date(battle.timestamp).toLocaleTimeString()}
+                        </span>
+                        <span className={
+                            battle.attacker.faction === userFaction
+                                ? battle.winner === 'attacker'
+                                    ? 'text-green-500'
+                                    : 'text-red-500'
+                                : battle.winner === 'defender'
+                                    ? 'text-green-500'
+                                    : 'text-red-500'
+                        }>
+                            {battle.attacker.faction === userFaction
+                                ? battle.winner === 'attacker'
+                                    ? 'Victory'
+                                    : 'Defeat'
+                                : battle.winner === 'defender'
+                                    ? 'Victory'
+                                    : 'Defeat'
+                            }
                         </span>
                     </div>
                     <div className="mt-2 flex justify-between items-center">
@@ -44,13 +66,6 @@ export default function BattleHistory() {
                                 {battle.defender.faction}
                             </div>
                         </div>
-                    </div>
-                    <div className="mt-2 text-center text-sm">
-                        <span className={`font-bold ${
-                            battle.winner === 'attacker' ? 'text-green-500' : 'text-red-500'
-                        }`}>
-                            {battle.winner === 'attacker' ? 'Victory' : 'Defeat'}
-                        </span>
                     </div>
                 </div>
             ))}
