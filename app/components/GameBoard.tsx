@@ -35,7 +35,7 @@ export function GameBoard({ userFaction, nfts, onGameStart }: GameBoardProps) {
 
     useEffect(() => {
         // Load or start game
-        let currentGame = gameService.getCurrentGame();
+        let currentGame = gameService.getGameState();
         if (!currentGame) {
             currentGame = gameService.startNewGame();
             onGameStart();
