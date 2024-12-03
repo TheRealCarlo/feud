@@ -175,7 +175,7 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
         const isOccupied = targetSquare.bear !== null;
 
         // If square is occupied by another faction, initiate battle
-        if (isOccupied && targetSquare.faction !== userFaction) {
+        if (isOccupied && targetSquare.faction !== userFaction && targetSquare.bear) {
             setBattleResult('Battle in progress...');
             
             try {
@@ -201,7 +201,7 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                     defender: {
                         tokenId: defenderId,
                         name: targetSquare.bear.metadata.name,
-                        faction: targetSquare.faction
+                        faction: targetSquare.faction!
                     },
                     winner: attackerWins ? 'attacker' : 'defender'
                 };
