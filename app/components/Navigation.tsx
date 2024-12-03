@@ -3,8 +3,8 @@ import { Faction } from '../types/game';
 
 interface NavigationProps {
     userFaction: Faction;
-    activeView: 'game' | 'inventory' | 'history';
-    onViewChange: (view: 'game' | 'inventory' | 'history') => void;
+    activeView: 'game' | 'inventory' | 'history' | 'leaderboard';
+    onViewChange: (view: 'game' | 'inventory' | 'history' | 'leaderboard') => void;
 }
 
 export function Navigation({ userFaction, activeView, onViewChange }: NavigationProps) {
@@ -61,6 +61,24 @@ export function Navigation({ userFaction, activeView, onViewChange }: Navigation
                         🐻 My Bearz
                     </span>
                     {activeView === 'inventory' && (
+                        <div className={`absolute bottom-0 left-0 w-full h-0.5 ${getFactionColor(userFaction)}`} />
+                    )}
+                </button>
+
+                <button
+                    onClick={() => onViewChange('leaderboard')}
+                    className={`
+                        flex-1 py-4 px-6 text-center font-medium text-sm
+                        transition-all duration-200 relative
+                        ${activeView === 'leaderboard'
+                            ? 'text-gray-900 dark:text-white'
+                            : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}
+                    `}
+                >
+                    <span className="flex items-center justify-center gap-2">
+                        🏆 Leaderboard
+                    </span>
+                    {activeView === 'leaderboard' && (
                         <div className={`absolute bottom-0 left-0 w-full h-0.5 ${getFactionColor(userFaction)}`} />
                     )}
                 </button>

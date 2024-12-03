@@ -364,8 +364,48 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
             }
 
             if (currentGame && 'squares' in currentGame) {
-                console.log('Refreshed game state:', currentGame);
-                setGameState(currentGame as GameState);
+                // Update squares to reflect battle outcomes
+                const updatedSquares = currentGame.squares.map(square => {
+                    if (!square.bear) return square;
+
+                    // Check if the bear is in cooldown
+                    const isInCooldown = currentGame.cooldowns?.some(
+                        cooldown => 
+                            String(cooldown.tokenId) === String(square.bear.tokenId) &&
+                            cooldown.timestamp > Date.now()
+                    );
+
+                    // If the bear is in cooldown, it lost a battle and should be removed
+                    if (isInCooldown) {
+                        return {
+                            ...square,
+                            bear: null,
+                            faction: null
+                        };
+                    }
+
+                    return square;
+                });
+
+                // Update the game state with the new squares
+                const updatedGame = {
+                    ...currentGame,
+                    squares: updatedSquares
+                };
+
+                // Update the database with the new state
+                const { error: updateError } = await supabase
+                    .from('games')
+                    .update({ squares: updatedSquares })
+                    .eq('id', currentGame.id);
+
+                if (updateError) {
+                    console.error('Error updating squares:', updateError);
+                    return;
+                }
+
+                console.log('Refreshed game state:', updatedGame);
+                setGameState(updatedGame as GameState);
             }
         } catch (err) {
             console.error('Error during refresh:', err);
@@ -449,9 +489,7 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-gray-800 rounded-lg p-4 w-full max-w-md max-h-[80vh] overflow-y-auto">
                         <BearSelector
-                            nfts={nfts.filter(bear => 
-                                !gameState?.used_bears?.includes(bear.tokenId)
-                            )}
+                            nfts={nfts}
                             onSelect={handleBearSelect}
                             onClose={() => {
                                 setShowBearSelector(false);

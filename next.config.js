@@ -14,6 +14,17 @@ const nextConfig = {
 
         return config;
     },
+    // The images config should be at the root level, not inside webpack
+    images: {
+        remotePatterns: [
+            {
+                protocol: 'https',
+                hostname: 'allofthethings.s3.amazonaws.com',
+                port: '',
+                pathname: '/brawlerbearz/**',
+            },
+        ],
+    },
     // Add any other Next.js config options here
 };
 

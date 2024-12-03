@@ -20,7 +20,11 @@ const BattleHistory = dynamic(() => import('./components/BattleHistory'), {
     loading: () => <div className="text-white text-center p-4">Loading battle history...</div>
 });
 
-type View = 'game' | 'inventory' | 'history'
+const Leaderboard = dynamic(() => import('./components/Leaderboard'), {
+    loading: () => <div className="text-white text-center p-4">Loading leaderboard...</div>
+});
+
+type View = 'game' | 'inventory' | 'history' | 'leaderboard';
 
 export default function Home() {
   const [userFaction, setUserFaction] = useState<Faction | null>(null)
@@ -60,6 +64,10 @@ export default function Home() {
           <BattleHistory
             userFaction={userFaction}
           />
+        );
+      case 'leaderboard':
+        return (
+          <Leaderboard />
         );
       default:
         return null;
