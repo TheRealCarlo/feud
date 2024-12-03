@@ -1,82 +1,86 @@
 import { useState } from 'react';
 import { GameGrid } from './GameGrid';
-import { BearInventory } from './BearInventory';
-import { BattleHistory } from './BattleHistory';
-import { Faction } from '../types/game';
+import { BearSelector } from './BearSelector';
+import { Faction, GameState } from '../types/game';
 
 interface MenuProps {
+    gameState: GameState;
     userFaction: Faction;
-    gameState: any; // Replace with proper GameState type
-    selectedBear: string | null;
-    onBearSelect: (bearId: string) => void;
-    onPlaceBear: (position: { x: number; y: number }) => void;
     userAddress: string;
 }
 
-export function Menu({ 
-    userFaction, 
-    gameState, 
-    selectedBear, 
-    onBearSelect,
-    onPlaceBear,
-    userAddress 
-}: MenuProps) {
-    const [activeTab, setActiveTab] = useState<'game' | 'inventory' | 'history'>('game');
+export function Menu({ gameState, userFaction, userAddress }: MenuProps) {
+    const [selectedSquareId, setSelectedSquareId] = useState<number | null>(null);
+    const [showBearSelector, setShowBearSelector] = useState(false);
 
-    const tabs = [
-        { id: 'game', label: 'Game Board' },
-        { id: 'inventory', label: 'My Bearz' },
-        { id: 'history', label: 'Battle History' }
-    ];
+    const handleSquareClick = (squareId: number) => {
+        const square = gameState.squares[squareId];
+        
+        // If square belongs to user's faction, do nothing
+        if (square.faction === userFaction) return;
+        
+        // If square is occupied by another faction, initiate battle
+        if (square.faction && square.faction !== userFaction) {
+            console.log('Battle initiated!');
+            setSelectedSquareId(squareId);
+            setShowBearSelector(true);
+            return;
+        }
+        
+        // If square is empty, allow placement
+        setSelectedSquareId(squareId);
+        setShowBearSelector(true);
+    };
+
+    const handleBearSelect = (bear: any) => {
+        if (selectedSquareId === null) return;
+        
+        // Handle bear placement or battle logic here
+        console.log('Bear selected:', bear, 'for square:', selectedSquareId);
+        
+        setShowBearSelector(false);
+        setSelectedSquareId(null);
+    };
 
     return (
-        <div className="w-full max-w-6xl mx-auto">
-            {/* Tab Navigation */}
-            <div className="flex space-x-1 border-b border-gray-200 mb-8">
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                        className={`
-                            px-6 py-3 text-sm font-medium rounded-t-lg
-                            transition-colors duration-200
-                            ${activeTab === tab.id 
-                                ? 'bg-white text-gray-900 border-t border-x border-gray-200' 
-                                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}
-                        `}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
+        <div className="flex flex-col items-center gap-6">
+            {/* Game Stats */}
+            <div className="flex gap-4 justify-center text-sm">
+                <div className="px-4 py-2 bg-gray-800 rounded-lg">
+                    <span className="text-gray-400">Your Bears:</span>
+                    <span className="ml-2 text-white">
+                        {gameState.squares.filter(s => s.faction === userFaction).length}
+                    </span>
+                </div>
+                <div className="px-4 py-2 bg-gray-800 rounded-lg">
+                    <span className="text-gray-400">Territory:</span>
+                    <span className="ml-2 text-white">
+                        {Math.round((gameState.squares.filter(s => s.faction === userFaction).length / 64) * 100)}%
+                    </span>
+                </div>
             </div>
 
-            {/* Tab Content */}
-            <div className="p-4">
-                {activeTab === 'game' && (
-                    <GameGrid
-                        gameState={gameState}
-                        selectedBear={selectedBear}
-                        userFaction={userFaction}
-                        onPlaceBear={onPlaceBear}
-                        userAddress={userAddress}
-                    />
-                )}
-                
-                {activeTab === 'inventory' && (
-                    <BearInventory
-                        selectedBear={selectedBear}
-                        onBearSelect={onBearSelect}
-                        userFaction={userFaction}
-                    />
-                )}
-                
-                {activeTab === 'history' && (
-                    <BattleHistory
-                        userAddress={userAddress}
-                        userFaction={userFaction}
-                    />
-                )}
-            </div>
+            {/* Game Grid */}
+            <GameGrid
+                gameState={gameState}
+                userFaction={userFaction}
+                onSquareClick={handleSquareClick}
+                selectedSquareId={selectedSquareId}
+            />
+
+            {/* Bear Selector Modal */}
+            {showBearSelector && (
+                <BearSelector
+                    nfts={[]} // Pass your NFTs here
+                    onSelect={handleBearSelect}
+                    onClose={() => {
+                        setShowBearSelector(false);
+                        setSelectedSquareId(null);
+                    }}
+                    gameState={gameState}
+                    isBattle={!!gameState.squares[selectedSquareId!]?.faction}
+                />
+            )}
         </div>
     );
 } 
