@@ -18,6 +18,18 @@ interface GameBoardProps {
     onGameStart: () => void;
 }
 
+interface Square {
+    id: number;
+    bear: {
+        tokenId: string;
+        metadata: {
+            name: string;
+            image: string;
+        };
+    } | null;
+    faction: Faction | null;
+}
+
 const getFactionColor = (faction: Faction): string => {
     switch (faction) {
         case 'IRON':
@@ -365,7 +377,7 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
 
             if (currentGame && 'squares' in currentGame) {
                 // Update squares to reflect battle outcomes
-                const updatedSquares = currentGame.squares.map(square => {
+                const updatedSquares = currentGame.squares.map((square: Square) => {
                     if (!square.bear) return square;
 
                     // Check if the bear is in cooldown
