@@ -25,11 +25,13 @@ export default function Home() {
   };
 
   const renderActiveView = () => {
+    if (!userFaction) return null;
+
     switch (activeView) {
       case 'game':
         return (
           <GameBoard
-            userFaction={userFaction!}
+            userFaction={userFaction}
             nfts={nfts}
             onGameStart={handleGameStart}
           />
@@ -38,13 +40,13 @@ export default function Home() {
         return (
           <BearInventory
             nfts={nfts}
-            userFaction={userFaction!}
+            userFaction={userFaction}
           />
         );
       case 'history':
         return (
           <BattleHistory
-            userFaction={userFaction!}
+            userFaction={userFaction}
           />
         );
       default:

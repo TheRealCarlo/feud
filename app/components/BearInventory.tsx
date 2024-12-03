@@ -1,63 +1,57 @@
-import { useState, useEffect } from 'react';
 import { Faction } from '../types/game';
 
-interface BearInventoryProps {
-    selectedBear: string | null;
-    onBearSelect: (bearId: string) => void;
+export interface BearInventoryProps {
+    nfts: any[];
     userFaction: Faction;
 }
 
-export function BearInventory({ selectedBear, onBearSelect, userFaction }: BearInventoryProps) {
-    const [bears, setBears] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        // Load bears from cache or fetch them
-        const cachedBears = localStorage.getItem('brawler_bearz_cache');
-        if (cachedBears) {
-            setBears(JSON.parse(cachedBears).nfts);
-            setLoading(false);
-        }
-    }, []);
-
-    if (loading) {
-        return (
-            <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-            </div>
-        );
-    }
-
+export function BearInventory({ nfts, userFaction }: BearInventoryProps) {
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {bears.map((bear) => (
-                <div
-                    key={bear.tokenId}
-                    onClick={() => onBearSelect(bear.tokenId)}
-                    className={`
-                        relative border-2 rounded-lg p-4 cursor-pointer
-                        transition-all duration-200 hover:shadow-lg
-                        ${selectedBear === bear.tokenId ? 'border-yellow-400 shadow-lg' : 'border-gray-200'}
-                    `}
-                >
-                    <img
-                        src={bear.metadata.image}
-                        alt={bear.metadata.name}
-                        className="w-full h-48 object-cover rounded-md"
-                    />
-                    <div className="mt-2">
-                        <h3 className="font-bold">{bear.metadata.name}</h3>
-                        <p className="text-sm text-gray-600">#{bear.tokenId}</p>
-                    </div>
-                    {selectedBear === bear.tokenId && (
-                        <div className="absolute top-2 right-2 bg-yellow-400 rounded-full p-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
+        <div className="container mx-auto p-4">
+            <h2 className="text-2xl font-bold text-white mb-6">Your Bear Collection</h2>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {nfts.map((bear) => (
+                    <div 
+                        key={bear.tokenId}
+                        className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-gray-500 transition-all duration-200"
+                    >
+                        <div className="aspect-square">
+                            <img 
+                                src={bear.metadata.image} 
+                                alt={bear.metadata.name}
+                                className="w-full h-full object-cover"
+                            />
                         </div>
-                    )}
+                        <div className="p-4">
+                            <h3 className="text-lg font-semibold text-white mb-2">
+                                {bear.metadata.name}
+                            </h3>
+                            <p className="text-sm text-gray-400">
+                                #{bear.tokenId}
+                            </p>
+                            <div className="mt-2">
+                                <span className={`inline-block px-2 py-1 rounded-full text-sm ${
+                                    userFaction === 'IRON' ? 'bg-blue-500 text-white' :
+                                    userFaction === 'GEO' ? 'bg-orange-500 text-white' :
+                                    userFaction === 'TECH' ? 'bg-gray-500 text-white' :
+                                    'bg-purple-500 text-white'
+                                }`}>
+                                    {userFaction}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {nfts.length === 0 && (
+                <div className="text-center py-12">
+                    <p className="text-gray-400">
+                        No Brawler Bearz found in your collection.
+                    </p>
                 </div>
-            ))}
+            )}
         </div>
     );
 } 
