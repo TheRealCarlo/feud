@@ -117,9 +117,11 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                     schema: 'public',
                     table: 'games'
                 },
-                (payload) => {
+                (payload: any) => {
                     console.log('Received game update:', payload);
-                    setGameState(payload.new);
+                    if (payload.new && 'squares' in payload.new) {
+                        setGameState(payload.new as GameState);
+                    }
                 }
             )
             .subscribe();
@@ -156,8 +158,10 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                 return;
             }
 
-            console.log('Refreshed game state:', currentGame);
-            setGameState(currentGame);
+            if (currentGame && 'squares' in currentGame) {
+                console.log('Refreshed game state:', currentGame);
+                setGameState(currentGame as GameState);
+            }
         } catch (err) {
             console.error('Error during refresh:', err);
         }
