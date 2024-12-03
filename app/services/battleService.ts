@@ -1,7 +1,8 @@
 import { BrowserProvider, Contract } from 'ethers';
 import { Faction, GameState } from '../types/game';
 
-const BATTLE_CONTRACT_ADDRESS = '0x20aCfa11998c23896A61E467cB0F605C2d46C7B7';
+// Test contract address for development
+const BATTLE_CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'; // Local hardhat default first address
 
 const BATTLE_ABI = [
     {
@@ -25,68 +26,73 @@ export const battleService = {
         defenderId: string
     ): Promise<boolean> {
         try {
-            // Verify network first
+            // Verify network and log details
             const network = await provider.getNetwork();
-            console.log('Current network:', {
+            console.log('Network details:', {
                 chainId: network.chainId,
-                name: network.name
+                name: network.name,
+                provider: provider.constructor.name
             });
 
-            // Get signer
+            // Get signer and address
             const signer = await provider.getSigner();
-            console.log('Signer address:', await signer.getAddress());
+            const signerAddress = await signer.getAddress();
+            console.log('Signer details:', { address: signerAddress });
 
-            // Create contract instance with signer
+            // Check contract code
+            const code = await provider.getCode(BATTLE_CONTRACT_ADDRESS);
+            console.log('Contract code length:', code.length);
+            
+            if (code === '0x' || code === '0x0') {
+                console.error('No contract found at address:', BATTLE_CONTRACT_ADDRESS);
+                throw new Error('Contract not deployed at specified address');
+            }
+
+            // Create contract instance
             const contract = new Contract(
                 BATTLE_CONTRACT_ADDRESS,
                 BATTLE_ABI,
                 signer
             );
 
-            // Verify contract exists
-            const code = await provider.getCode(BATTLE_CONTRACT_ADDRESS);
-            if (code === '0x') {
-                throw new Error(`No contract found at ${BATTLE_CONTRACT_ADDRESS}`);
-            }
-
-            console.log('Contract instance created and verified');
-
-            // Format token IDs
-            const attacker = BigInt(attackerId);
-            const defender = BigInt(defenderId);
+            // Log battle parameters
             console.log('Battle parameters:', {
-                attacker: attacker.toString(),
-                defender: defender.toString(),
-                contractAddress: BATTLE_CONTRACT_ADDRESS
+                attacker: attackerId,
+                defender: defenderId,
+                contract: BATTLE_CONTRACT_ADDRESS
             });
 
-            // Attempt contract call
-            console.log('Calling contract...');
-            const result = await contract.calculateBattleOutcome(attacker, defender);
-            console.log('Battle result:', result);
-            
-            return result;
+            // Call contract with proper error handling
+            try {
+                const result = await contract.calculateBattleOutcome(
+                    BigInt(attackerId),
+                    BigInt(defenderId)
+                );
+                console.log('Battle result:', result);
+                return result;
+            } catch (contractError) {
+                console.error('Contract call failed:', {
+                    error: contractError,
+                    method: 'calculateBattleOutcome',
+                    params: [attackerId, defenderId]
+                });
+                throw contractError;
+            }
         } catch (error) {
-            // Enhanced error logging
-            const errorDetails = {
+            console.error('Battle service error:', {
                 message: error instanceof Error ? error.message : 'Unknown error',
                 name: error instanceof Error ? error.name : 'UnknownError',
                 stack: error instanceof Error ? error.stack : undefined,
                 attackerId,
                 defenderId,
                 contractAddress: BATTLE_CONTRACT_ADDRESS,
-                errorObject: error,
                 timestamp: new Date().toISOString()
-            };
-            
-            console.error('Battle service error:', errorDetails);
-            
-            // For development/debugging
-            console.error('Full error:', error);
-            
-            // Use fallback for now
-            console.log('Using fallback battle resolution');
-            return Math.random() > 0.5;
+            });
+
+            // Fallback to random outcome for development
+            const fallbackResult = Math.random() > 0.5;
+            console.log('Using fallback battle resolution:', fallbackResult);
+            return fallbackResult;
         }
     },
 
