@@ -186,8 +186,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
     };
 
     return (
-        <div className="game-board max-w-4xl mx-auto">
-            {/* Game Board Container */}
+        <div className="game-board max-w-4xl mx-auto relative">
             <div className="bg-gray-800/90 rounded-2xl shadow-2xl p-6 backdrop-blur-sm">
                 {/* Territory Stats */}
                 <div className="mb-6 text-center">
@@ -293,18 +292,22 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                     <div>Total Moves: {gameState?.totalBattles ?? 0}</div>
                 </div>
 
-                {/* Conditional rendering for the component that requires gameState */}
-                {gameState && (
-                    <BearSelector
-                        nfts={nfts}
-                        onSelect={() => setShowBearSelector(false)}
-                        onClose={() => {
-                            setShowBearSelector(false);
-                            setSelectedSquareId(null);
-                        }}
-                        gameState={gameState}
-                        isBattle={!!gameState.squares[selectedSquareId!]?.faction}
-                    />
+                {/* Render BearSelector as a modal when selectedSquareId exists */}
+                {selectedSquareId !== null && gameState && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75">
+                        <BearSelector
+                            nfts={nfts}
+                            onSelect={(bear) => {
+                                // Your bear selection logic
+                                setSelectedSquareId(null);
+                            }}
+                            onClose={() => {
+                                setSelectedSquareId(null);
+                            }}
+                            gameState={gameState}
+                            isBattle={!!gameState.squares[selectedSquareId]?.faction}
+                        />
+                    </div>
                 )}
             </div>
         </div>

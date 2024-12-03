@@ -19,8 +19,6 @@ interface Cooldown {
 }
 
 export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: BearSelectorProps) {
-    const [allBears, setAllBears] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -34,7 +32,7 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: B
 
         // Check if NFTs are loaded
         if (!nfts || nfts.length === 0) {
-            setIsLoading(true);
+            setLoading(true);
             return;
         }
 
@@ -79,8 +77,8 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: B
             });
         }
 
-        setAllBears(Array.from(allBearsMap.values()));
-        setIsLoading(false);
+        setCooldowns(Array.from(allBearsMap.values()));
+        setLoading(false);
     }, [nfts, gameState?.cooldowns, gameState?.used_bears]);
 
     useEffect(() => {
@@ -140,117 +138,131 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: B
     useEffect(() => {
         const interval = setInterval(() => {
             // Force a re-render to update cooldown times
-            setAllBears(prevBears => [...prevBears]);
+            setCooldowns(prevCooldowns => [...prevCooldowns]);
         }, 1000); // Update every second
 
         return () => clearInterval(interval);
     }, []);
 
-    if (isLoading && (!nfts || nfts.length === 0)) {
-        return (
-            <div className="flex flex-col items-center gap-4">
-                <h2 className="text-lg font-bold text-white">Loading Bears...</h2>
-                <div className="animate-pulse flex space-x-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {[1, 2, 3, 4, 5, 6].map((n) => (
-                            <div 
-                                key={n} 
-                                className="w-32 h-40 bg-gray-700 rounded-lg"
-                            />
-                        ))}
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    const renderBearCard = (bear: any) => {
-        const inCooldown = isInCooldown(bear.tokenId);
-        const cooldownTime = getCooldownTimeRemaining(bear.tokenId);
-
-        // Check if bear is in battle
-        const isInBattle = gameState?.used_bears?.includes(String(bear.tokenId));
-
-        // Determine if the bear is disabled
-        const isDisabled = inCooldown || isInBattle;
-
-        return (
-            <div
-                key={bear.tokenId}
-                className={`
-                    relative bg-gray-700 rounded-lg p-2 
-                    ${isDisabled 
-                        ? 'opacity-75 cursor-not-allowed' 
-                        : 'cursor-pointer hover:bg-gray-600 hover:transform hover:scale-105'}
-                    transition-all duration-200
-                `}
-                onClick={() => !isDisabled && onSelect(bear)}
-            >
-                <div className="relative w-full h-24">
-                    <OptimizedImage 
-                        src={bear.metadata.image} 
-                        alt={bear.metadata.name}
-                        height="100%"
-                        className="rounded-md"
-                    />
-                    {isDisabled && (
-                        <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center rounded-md">
-                            {inCooldown ? (
-                                <div className="text-center">
-                                    <div className="text-yellow-400 text-sm font-medium mb-1">
-                                        Cooldown
-                                    </div>
-                                    <div className="text-white text-xs">
-                                        {cooldownTime}
-                                    </div>
-                                </div>
-                            ) : isInBattle && (
-                                <div className="text-red-400 text-sm font-medium">
-                                    In Battle
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-                
-                <div className="mt-2 text-center text-white text-sm truncate">
-                    {bear.metadata.name}
-                </div>
-                
-                <div className={`
-                    mt-1 text-center text-xs font-medium
-                    ${inCooldown 
-                        ? 'text-yellow-400' 
-                        : isInBattle 
-                            ? 'text-red-400'
-                            : 'text-green-400'}
-                `}>
-                    {inCooldown 
-                        ? `Cooldown: ${cooldownTime}` 
-                        : isInBattle 
-                            ? 'In Battle'
-                            : 'Ready'}
-                </div>
-            </div>
-        );
-    };
+    const filteredBears = nfts.filter((nft) => {
+        const inCooldown = isInCooldown(nft.tokenId);
+        const inBattle = gameState?.used_bears?.includes(nft.tokenId);
+        return !inBattle || inCooldown; // Show only bears not in battle or in cooldown
+    });
 
     return (
-        <div className="flex flex-col items-center gap-4">
-            <h2 className="text-lg font-bold text-white">
-                {isBattle ? 'Select Bear for Battle' : 'Select Bear for Placement'}
-            </h2>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto p-2">
-                {allBears.map(renderBearCard)}
+        <div className="bg-gray-900/95 backdrop-blur-lg rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden border border-gray-700">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-700/50">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                        {isBattle ? 'Choose Your Fighter' : 'Deploy Your Bear'}
+                    </h2>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                    >
+                        <svg 
+                            className="w-6 h-6 text-gray-400 hover:text-white" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <p className="text-gray-400 mt-2">
+                    {isBattle 
+                        ? 'Select a bear to engage in battle' 
+                        : 'Choose a bear to place on this territory'}
+                </p>
             </div>
 
-            <button
-                onClick={onClose}
-                className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-            >
-                Close
-            </button>
+            {/* Bears Grid */}
+            <div className="p-6">
+                {loading ? (
+                    <div className="flex justify-center items-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-600 border-t-blue-500"></div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {filteredBears.map((nft) => {
+                            const cooldownTime = getCooldownTimeRemaining(nft.tokenId);
+                            const inCooldown = isInCooldown(nft.tokenId);
+                            
+                            return (
+                                <div
+                                    key={nft.tokenId}
+                                    className={`
+                                        group relative bg-gray-800 rounded-xl overflow-hidden
+                                        ${inCooldown 
+                                            ? 'opacity-60 cursor-not-allowed' 
+                                            : 'cursor-pointer hover:transform hover:scale-[1.02] hover:shadow-xl'}
+                                        transition-all duration-300 ease-out
+                                    `}
+                                    onClick={() => !inCooldown && onSelect(nft)}
+                                >
+                                    {/* Bear Image */}
+                                    <div className="aspect-square relative">
+                                        <img 
+                                            src={nft.metadata.image} 
+                                            alt={nft.metadata.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                        {/* Hover Overlay */}
+                                        {!inCooldown && (
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                <div className="absolute bottom-4 left-4 text-white font-semibold">
+                                                    Click to {isBattle ? 'Battle' : 'Deploy'}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {/* Cooldown Overlay */}
+                                        {inCooldown && (
+                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
+                                                <div className="bg-black/80 px-4 py-2 rounded-lg text-center">
+                                                    <p className="text-yellow-400 font-medium">On Cooldown</p>
+                                                    <p className="text-white text-sm mt-1">{cooldownTime}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Bear Info */}
+                                    <div className="p-4">
+                                        <h3 className="text-white font-semibold truncate">
+                                            {nft.metadata.name}
+                                        </h3>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <span className="text-gray-400 text-sm">#{nft.tokenId}</span>
+                                            <div className={`
+                                                px-2 py-1 rounded-full text-xs font-medium
+                                                ${nft.metadata.faction === 'IRON' ? 'bg-blue-500/20 text-blue-400' :
+                                                  nft.metadata.faction === 'GEO' ? 'bg-orange-500/20 text-orange-400' :
+                                                  nft.metadata.faction === 'TECH' ? 'bg-gray-500/20 text-gray-400' :
+                                                  'bg-purple-500/20 text-purple-400'}
+                                            `}>
+                                                {nft.metadata.faction}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-700/50">
+                <button
+                    onClick={onClose}
+                    className="w-full py-3 px-4 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition-colors duration-200 font-medium"
+                >
+                    Cancel Selection
+                </button>
+            </div>
         </div>
     );
 }
