@@ -1,15 +1,35 @@
 import { useEffect, useState } from 'react';
 import { gameService } from '../services/gameService';
 import { OptimizedImage } from './OptimizedImage';
+import { Faction } from '../types/game';
 
 interface BearStats {
     tokenId: string;
     name: string;
-    image: string;
-    faction: string;
+    image: string | null;
+    faction: Faction;
     wins: number;
     losses: number;
     winRate: number;
+}
+
+interface BearMetadata {
+    name: string;
+    image: string;
+}
+
+interface BattleParticipant {
+    tokenId: string;
+    name: string;
+    metadata: BearMetadata;
+    faction: Faction;
+}
+
+interface Battle {
+    attacker: BattleParticipant;
+    defender: BattleParticipant;
+    winner: 'attacker' | 'defender';
+    timestamp: number;
 }
 
 export default function Leaderboard() {
@@ -18,7 +38,7 @@ export default function Leaderboard() {
 
     useEffect(() => {
         const calculateLeaderboard = () => {
-            const battles = gameService.getBattleHistory();
+            const battles = gameService.getBattleHistory() as Battle[];
             const bearStats = new Map<string, BearStats>();
 
             // Process all battles
