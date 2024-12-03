@@ -61,18 +61,7 @@ const setToCache = (nfts: any[]) => {
 };
 
 const getFactionColor = (faction: Faction): string => {
-    switch (faction) {
-        case 'IRON':
-            return 'bg-blue-500 text-white';
-        case 'GEO':
-            return 'bg-orange-500 text-white';
-        case 'TECH':
-            return 'bg-gray-500 text-white';
-        case 'PAW':
-            return 'bg-purple-500 text-white';
-        default:
-            return 'bg-gray-300 text-gray-700';
-    }
+    return `${FACTION_COLORS[faction].primary} ${FACTION_COLORS[faction].text}`;
 };
 
 export function WalletConnect({ onFactionDetermined, onNftsLoaded }: { 

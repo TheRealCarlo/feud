@@ -1,5 +1,28 @@
 export type Faction = 'IRON' | 'GEO' | 'TECH' | 'PAW';
 
+export const FACTION_COLORS = {
+    IRON: {
+        primary: 'bg-blue-500',
+        text: 'text-white',
+        border: 'border-blue-500'
+    },
+    GEO: {
+        primary: 'bg-orange-500',
+        text: 'text-white',
+        border: 'border-orange-500'
+    },
+    TECH: {
+        primary: 'bg-gray-500',
+        text: 'text-white',
+        border: 'border-gray-500'
+    },
+    PAW: {
+        primary: 'bg-purple-500',
+        text: 'text-white',
+        border: 'border-purple-500'
+    }
+} as const;
+
 export interface PlacedBear {
     tokenId: string;
     metadata: {
