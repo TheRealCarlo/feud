@@ -40,8 +40,8 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: B
 
             if (gameState?.cooldowns && Array.isArray(gameState.cooldowns)) {
                 gameState.cooldowns.forEach(cooldown => {
-                    if (cooldown && typeof cooldown.endTime === 'number' && cooldown.tokenId) {
-                        const timeLeft = cooldown.endTime - now;
+                    if (cooldown && typeof cooldown.timestamp === 'number' && cooldown.tokenId) {
+                        const timeLeft = cooldown.timestamp - now;
                         if (timeLeft > 0) {
                             newCooldowns[cooldown.tokenId] = timeLeft;
                         }
