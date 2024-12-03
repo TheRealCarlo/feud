@@ -1,5 +1,6 @@
 import { BrowserProvider } from 'ethers';
 import { BATTLE_CONTRACT_ADDRESS } from '../config/contracts';
+import { GameState } from '../types/game';
 
 export const battleService = {
     async initiateBattle(provider: BrowserProvider, attackerId: string, defenderId: string): Promise<boolean> {
@@ -44,5 +45,33 @@ export const battleService = {
             // Even if there's an error, return a random result
             return Math.random() < 0.6;
         }
+    },
+
+    handleBattleLoss(gameState: GameState, bearId: string): GameState {
+        // Create a deep copy of the game state
+        const newGameState = JSON.parse(JSON.stringify(gameState));
+
+        // Add the bear to cooldowns
+        const cooldownDuration = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        const cooldownEndTime = Date.now() + cooldownDuration;
+
+        // Initialize cooldowns array if it doesn't exist
+        if (!newGameState.cooldowns) {
+            newGameState.cooldowns = [];
+        }
+
+        // Add new cooldown
+        newGameState.cooldowns.push({
+            tokenId: bearId,
+            timestamp: cooldownEndTime
+        });
+
+        // Remove the bear from used_bears if it exists there
+        if (newGameState.used_bears) {
+            newGameState.used_bears = newGameState.used_bears.filter(id => id !== bearId);
+        }
+
+        console.log('Updated game state after battle loss:', newGameState);
+        return newGameState;
     }
 }; 
