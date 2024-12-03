@@ -99,12 +99,12 @@ export const battleService = {
     handleBattleLoss(gameState: GameState, bearTokenId: string): GameState {
         const now = Date.now();
         const updatedCooldowns = gameState.cooldowns.filter(bear => 
-            bear.cooldownUntil === null || bear.cooldownUntil > now
+            bear.timestamp > now
         );
 
         updatedCooldowns.push({
             tokenId: bearTokenId,
-            cooldownUntil: now + COOLDOWN_DURATION
+            timestamp: now + COOLDOWN_DURATION
         });
 
         return {
