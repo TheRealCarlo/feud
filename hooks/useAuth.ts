@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { User } from '@supabase/supabase-js'
 
 export function useAuth() {
-    const [user, setUser] = useState(null)
+    const [user, setUser] = useState<User | null>(null)
 
     useEffect(() => {
         // Get initial session
