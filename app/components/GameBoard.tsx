@@ -17,6 +17,14 @@ interface Cooldown {
     end_time: number;
 }
 
+// Define the Square type based on your data structure
+interface Square {
+    id: string;
+    faction: Faction | null;
+    bear: any; // Replace 'any' with the actual type if available
+    // Add other properties as needed
+}
+
 const getFactionColor = (faction: Faction): string => {
     switch (faction) {
         case 'IRON':
@@ -129,7 +137,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
         return () => clearInterval(intervalId);
     }, [refreshGameState]);
 
-    const calculateTerritoryStats = useCallback((squares: any[]) => {
+    const calculateTerritoryStats = useCallback((squares: Square[]) => {
         const totalSquares = squares.length;
         const factionCounts: Record<Faction, number> = {
             IRON: 0,
@@ -175,7 +183,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
 
     useEffect(() => {
         if (gameState?.squares) {
-            calculateTerritoryStats(gameState.squares);
+            calculateTerritoryStats(gameState.squares as Square[]);
         }
     }, [gameState?.squares, calculateTerritoryStats]);
 
