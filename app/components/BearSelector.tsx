@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GameState } from '../types/game';
 import { battleService } from '../services/battleService';
 
@@ -11,6 +11,29 @@ interface BearSelectorProps {
 }
 
 export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle = false }: BearSelectorProps) {
+    const [availableBears, setAvailableBears] = useState(nfts);
+
+    // Update available bears when cooldowns change
+    useEffect(() => {
+        const now = Date.now();
+        const filteredBears = nfts.filter(bear => {
+            const cooldown = battleService.getBearCooldown(gameState, bear.tokenId);
+            return !cooldown || cooldown <= now;
+        });
+        setAvailableBears(filteredBears);
+
+        // Set up interval to check cooldowns
+        const interval = setInterval(() => {
+            const updatedBears = nfts.filter(bear => {
+                const cooldown = battleService.getBearCooldown(gameState, bear.tokenId);
+                return !cooldown || cooldown <= now;
+            });
+            setAvailableBears(updatedBears);
+        }, 1000); // Check every second
+
+        return () => clearInterval(interval);
+    }, [nfts, gameState.cooldowns]);
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-gray-100 dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
@@ -32,7 +55,7 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle = fa
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                         {nfts.map((bear) => {
                             const cooldownUntil = battleService.getBearCooldown(gameState, bear.tokenId);
-                            const isOnCooldown = cooldownUntil !== null;
+                            const isOnCooldown = cooldownUntil !== null && cooldownUntil > Date.now();
                             const cooldownTime = isOnCooldown ? battleService.formatCooldownTime(cooldownUntil) : '';
 
                             return (

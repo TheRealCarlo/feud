@@ -1,24 +1,21 @@
-import { GameState, BattleResult, Faction } from '../types/game';
+import { GameState, Square, BattleResult, Faction } from '../types/game';
 
-const GAME_STATE_KEY = 'current_game_state';
-const BATTLE_HISTORY_KEY = 'battle_history';
 const GAME_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const GAME_STATE_KEY = 'brawler_bearz_game_state';
+const BATTLE_HISTORY_KEY = 'brawler_bearz_battle_history';
 
 export const gameService = {
-    getCurrentGame: (): GameState | null => {
-        const state = localStorage.getItem(GAME_STATE_KEY);
-        if (!state) return null;
+    getGameState: (): GameState | null => {
+        const savedState = localStorage.getItem(GAME_STATE_KEY);
+        if (!savedState) return null;
         
-        const gameState: GameState = JSON.parse(state);
-        
-        // Check if game has ended
-        if (gameState.isActive && Date.now() >= gameState.endTime) {
-            const battleResult = gameService.endGame(gameState);
-            gameService.saveBattleResult(battleResult);
+        try {
+            const state = JSON.parse(savedState);
+            return state;
+        } catch (error) {
+            console.error('Error parsing game state:', error);
             return null;
         }
-        
-        return gameState;
     },
 
     startNewGame: (): GameState => {
@@ -32,64 +29,66 @@ export const gameService = {
                 bear: null,
                 faction: null
             })),
-            usedBears: []
+            usedBears: [],
+            cooldowns: [] // Initialize empty cooldowns array
         };
-        
+
         localStorage.setItem(GAME_STATE_KEY, JSON.stringify(newGame));
         return newGame;
     },
 
-    updateGameState: (state: GameState) => {
+    updateGameState: (state: GameState): void => {
         localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state));
     },
 
-    endGame: (state: GameState): BattleResult => {
-        // Calculate scores
-        const scores = state.squares.reduce((acc, square) => {
-            if (square.faction) {
-                acc[square.faction] = (acc[square.faction] || 0) + 1;
-            }
-            return acc;
-        }, {} as Record<Faction, number>);
-
-        // Determine winner
-        let winningFaction: Faction = 'IRON';
-        let maxScore = 0;
-        
-        (Object.entries(scores) as [Faction, number][]).forEach(([faction, score]) => {
-            if (score > maxScore) {
-                maxScore = score;
-                winningFaction = faction;
-            }
-        });
-
-        const battleResult: BattleResult = {
-            id: state.startTime.toString(),
-            startTime: state.startTime,
-            endTime: state.endTime,
-            winningFaction,
-            scores
-        };
-
-        // Clear current game
-        localStorage.removeItem(GAME_STATE_KEY);
-        
-        return battleResult;
-    },
-
-    saveBattleResult: (result: BattleResult) => {
-        const history = gameService.getBattleHistory();
-        history.unshift(result);
-        localStorage.setItem(BATTLE_HISTORY_KEY, JSON.stringify(history));
+    isBearUsed: (bearId: string): boolean => {
+        const state = gameService.getGameState();
+        if (!state) return false;
+        return state.usedBears.includes(bearId);
     },
 
     getBattleHistory: (): BattleResult[] => {
-        const history = localStorage.getItem(BATTLE_HISTORY_KEY);
-        return history ? JSON.parse(history) : [];
+        const savedHistory = localStorage.getItem(BATTLE_HISTORY_KEY);
+        if (!savedHistory) return [];
+        
+        try {
+            return JSON.parse(savedHistory);
+        } catch (error) {
+            console.error('Error parsing battle history:', error);
+            return [];
+        }
     },
 
-    isBearUsed: (tokenId: string): boolean => {
-        const currentGame = gameService.getCurrentGame();
-        return currentGame ? currentGame.usedBears.includes(tokenId) : false;
+    addBattleResult: (result: BattleResult): void => {
+        const history = gameService.getBattleHistory();
+        history.push(result);
+        localStorage.setItem(BATTLE_HISTORY_KEY, JSON.stringify(history));
+    },
+
+    getFactionScore: (faction: Faction): number => {
+        const state = gameService.getGameState();
+        if (!state) return 0;
+        
+        return state.squares.filter(square => square.faction === faction).length;
+    },
+
+    clearGameState: (): void => {
+        localStorage.removeItem(GAME_STATE_KEY);
+    },
+
+    isGameActive: (): boolean => {
+        const state = gameService.getGameState();
+        if (!state) return false;
+        
+        const now = Date.now();
+        return state.isActive && now < state.endTime;
+    },
+
+    getTimeRemaining: (): number => {
+        const state = gameService.getGameState();
+        if (!state) return 0;
+        
+        const now = Date.now();
+        return Math.max(0, state.endTime - now);
     }
 }; 

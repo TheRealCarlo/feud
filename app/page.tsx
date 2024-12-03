@@ -64,14 +64,12 @@ export default function Home() {
         backgroundRepeat: 'no-repeat',
       }}
     >
-      {/* Overlay for better readability */}
       <div className="absolute inset-0 bg-black bg-opacity-50" />
       
-      {/* Content */}
       <div className="relative z-10">
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-5xl font-bold text-center mb-8 text-white tracking-tight drop-shadow-lg">
-            Brawler Bearz Battle
+            Battle for NeoCity Town Square
           </h1>
 
           <WalletConnect 
