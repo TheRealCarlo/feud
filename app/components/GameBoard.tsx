@@ -42,9 +42,11 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
     const [isBattling, setIsBattling] = useState(false);
     const [battleResult, setBattleResult] = useState<string | null>(null);
 
+    // Add loading state
+    const [isLoading, setIsLoading] = useState(true);
+
     useEffect(() => {
         const fetchGameState = async () => {
-            console.log('Fetching game state...');
             try {
                 const { data: currentGame, error: fetchError } = await supabase
                     .from('games')
@@ -54,33 +56,15 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                     .single();
 
                 if (fetchError) {
-                    console.error('Error fetching game:', {
-                        message: fetchError.message,
-                        details: fetchError.details,
-                        hint: fetchError.hint,
-                        code: fetchError.code
-                    });
+                    console.error('Error fetching game:', fetchError);
                     return;
                 }
 
-                console.log('Current game:', currentGame);
-
                 if (!currentGame) {
-                    console.log('Creating new game...');
-                    const initialSquares = Array(64).fill(null).map((_, index) => ({
-                        id: index,
-                        bear: null,
-                        faction: null
-                    }));
-
+                    const initialState = gameService.createInitialGameState();
                     const { data: newGame, error: createError } = await supabase
                         .from('games')
-                        .insert([{
-                            squares: initialSquares,
-                            end_time: Date.now() + (24 * 60 * 60 * 1000),
-                            used_bears: [],
-                            is_active: true
-                        }])
+                        .insert([initialState])
                         .select()
                         .single();
 
@@ -89,11 +73,9 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                         return;
                     }
 
-                    console.log('New game created:', newGame);
                     setGameState(newGame);
                     onGameStart();
                 } else {
-                    console.log('Using existing game:', currentGame);
                     setGameState(currentGame);
                 }
             } catch (error) {
@@ -103,20 +85,20 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
 
         fetchGameState();
 
-        // Timer update
+        // Set up timer
         const timerInterval = setInterval(() => {
-            setGameState(prevState => {
-                if (!prevState) return null;
-                const timeLeft = prevState.end_time - Date.now();
-                const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-                setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
-                return prevState;
-            });
+            if (gameState) {
+                const timeRemaining = gameService.getTimeRemaining(gameState);
+                setTimeLeft(timeRemaining);
+
+                // Check if game has ended
+                if (!gameService.isGameActive(gameState)) {
+                    clearInterval(timerInterval);
+                }
+            }
         }, 1000);
 
-        // Subscription for real-time updates
+        // Set up real-time subscription
         const subscription = supabase
             .channel('game_updates')
             .on('postgres_changes', 
@@ -134,45 +116,66 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
             )
             .subscribe();
 
+        // Cleanup
         return () => {
             clearInterval(timerInterval);
             subscription.unsubscribe();
         };
-    }, []);
+    }, [gameState?.id, onGameStart]);
 
-    useEffect(() => {
-        if (gameState) {
-            console.log('Game State:', {
-                squareCount: gameState.squares.length,
-                firstSquare: gameState.squares[0],
-                lastSquare: gameState.squares[63],
-                allSquares: gameState.squares
-            });
+    // Add loading state check
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+            </div>
+        );
+    }
+
+    // Add null check for gameState
+    if (!gameState) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className="text-red-500">Error loading game state</div>
+            </div>
+        );
+    }
+
+    const handleSquareClick = (index: number) => {
+        if (!gameState) return;
+        
+        // Check if the game is still active
+        if (!gameService.isGameActive(gameState)) {
+            alert('Game has ended!');
+            return;
         }
-    }, [gameState]);
 
-    const refreshGameState = async () => {
-        console.log('Refreshing game state...');
-        try {
-            const { data: currentGame, error } = await supabase
-                .from('games')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-
-            if (error) {
-                console.error('Error refreshing game state:', error);
-                return;
-            }
-
-            if (currentGame && 'squares' in currentGame) {
-                console.log('Refreshed game state:', currentGame);
-                setGameState(currentGame as GameState);
-            }
-        } catch (err) {
-            console.error('Error during refresh:', err);
+        // Check if the square is already selected
+        if (selectedSquareId === index) {
+            setSelectedSquareId(null);
+            setShowBearSelector(false);
+            return;
         }
+
+        // Check if the square belongs to the user's faction
+        const square = gameState.squares[index];
+        if (square.faction === userFaction) {
+            alert('You already own this square!');
+            return;
+        }
+
+        // Check if the square is occupied by another faction
+        const isOccupied = square.bear !== null;
+        if (isOccupied && square.faction !== userFaction) {
+            // Allow battle
+            setSelectedSquareId(index);
+            setShowBearSelector(true);
+            return;
+        }
+
+        // For empty squares
+        setSelectedSquareId(index);
+        setShowBearSelector(true);
     };
 
     const handleBearSelect = async (bear: any) => {
@@ -306,17 +309,15 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
         }
     };
 
-    const handleSquareClick = (squareId: number) => {
-        setSelectedSquareId(squareId);
-        setShowBearSelector(true);
-    };
-
-    if (!gameState) {
-        return <div className="text-center text-white">Loading game state...</div>;
-    }
-
     return (
         <div className="flex flex-col items-center gap-6">
+            {/* Battle Result Message */}
+            {battleResult && (
+                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 bg-gray-800 text-white rounded-lg shadow-lg z-50 animate-fade-in">
+                    {battleResult}
+                </div>
+            )}
+
             {/* Timer Display */}
             <div className="px-4 py-2 bg-gray-800 rounded-lg text-white font-mono">
                 Time Remaining: {timeLeft}
@@ -326,12 +327,6 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
             {isBattling && (
                 <div className="px-4 py-2 bg-yellow-600 text-white rounded-lg animate-pulse">
                     Battle in progress...
-                </div>
-            )}
-
-            {battleResult && (
-                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 bg-gray-800 text-white rounded-lg shadow-lg z-50 animate-fade-in">
-                    {battleResult}
                 </div>
             )}
 
