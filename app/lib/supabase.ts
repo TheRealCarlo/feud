@@ -22,9 +22,10 @@ export const supabase = createClient(
     }
 )
 
-// Test the connection using async/await
-const testConnection = async () => {
+// Combine all tests into a single async function
+const testSupabaseConnection = async () => {
     try {
+        // Test basic connection
         const { data, error } = await supabase
             .from('games')
             .select('*')
@@ -40,39 +41,48 @@ const testConnection = async () => {
         } else {
             console.log('Supabase connection test succeeded:', data);
         }
+
+        // Test listing tables
+        try {
+            const { data: tables, error: tablesError } = await supabase
+                .from('_tables')
+                .select('*');
+                
+            if (tablesError) {
+                console.error('Error listing tables:', tablesError);
+            } else {
+                console.log('Tables in database:', tables);
+            }
+        } catch (err) {
+            console.error('Error accessing tables:', err);
+        }
+
+        // Test database version
+        try {
+            const { data: version, error: versionError } = await supabase
+                .rpc('version');
+                
+            if (versionError) {
+                console.error('Error getting version:', versionError);
+            } else {
+                console.log('Database version:', version);
+            }
+        } catch (err) {
+            console.error('Error checking version:', err);
+        }
+
     } catch (err) {
         if (err instanceof Error) {
-            console.error('Raw query error:', {
+            console.error('Supabase test error:', {
                 name: err.name,
                 message: err.message,
                 stack: err.stack
             });
         } else {
-            console.error('Unknown error:', err);
+            console.error('Unknown error during Supabase tests:', err);
         }
     }
 };
 
-// Run the test
-testConnection();
-
-// Test if we can list all tables
-supabase
-    .from('_tables')
-    .select('*')
-    .then(response => {
-        console.log('Tables in database:', response);
-    })
-    .catch(err => {
-        console.error('Error listing tables:', err);
-    });
-
-// Test if we can make any query at all
-supabase
-    .rpc('version')
-    .then(response => {
-        console.log('Database version:', response);
-    })
-    .catch(err => {
-        console.error('Error getting version:', err);
-    }); 
+// Run all tests
+testSupabaseConnection(); 
