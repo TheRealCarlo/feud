@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { OptimizedImage } from './OptimizedImage';
 import { supabase } from '../lib/supabase';
+import { Faction } from '../types/game';
 
 interface Cooldown {
     token_id: string;
@@ -15,7 +16,12 @@ interface BearRecord {
     losses: number;
 }
 
-export default function BearInventory({ nfts }: { nfts: any[] }) {
+interface BearInventoryProps {
+    nfts: any[];
+    userFaction: Faction;
+}
+
+export default function BearInventory({ nfts, userFaction }: BearInventoryProps) {
     const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
     const [gameState, setGameState] = useState<any>(null);
     const [bearRecords, setBearRecords] = useState<BearRecord[]>([]);
