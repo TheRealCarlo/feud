@@ -292,25 +292,21 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                     <div>Players Online: {gameState?.activePlayers ?? 0}</div>
                     <div>Total Moves: {gameState?.totalBattles ?? 0}</div>
                 </div>
-            </div>
 
-            {/* Bear Selector Modal */}
-            {showBearSelector && (
-                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
-                        <BearSelector
-                            nfts={nfts}
-                            onSelect={() => setShowBearSelector(false)}
-                            onClose={() => {
-                                setShowBearSelector(false);
-                                setSelectedSquareId(null);
-                            }}
-                            gameState={gameState}
-                            isBattle={!!gameState?.squares[selectedSquareId!]?.faction}
-                        />
-                    </div>
-                </div>
-            )}
+                {/* Conditional rendering for the component that requires gameState */}
+                {gameState && (
+                    <BearSelector
+                        nfts={nfts}
+                        onSelect={() => setShowBearSelector(false)}
+                        onClose={() => {
+                            setShowBearSelector(false);
+                            setSelectedSquareId(null);
+                        }}
+                        gameState={gameState}
+                        isBattle={!!gameState.squares[selectedSquareId!]?.faction}
+                    />
+                )}
+            </div>
         </div>
     );
 });
