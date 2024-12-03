@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserProvider } from 'ethers';
 import { BearSelector } from './BearSelector';
-import { Faction, GameState } from '../types/game';
+import { Faction, GameState, Battle } from '../types/game';
 import { gameService } from '../services/gameService';
 import { battleService } from '../services/battleService';
 import { supabase } from '../lib/supabase'
@@ -198,8 +198,8 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                     defenderId
                 );
 
-                // Create battle record
-                const battleRecord = {
+                // Create battle record with correct types
+                const battleRecord: Battle = {
                     timestamp: Date.now(),
                     attacker: {
                         tokenId: attackerId,
@@ -211,7 +211,7 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                         name: targetSquare.bear.metadata.name,
                         faction: targetSquare.faction!
                     },
-                    winner: attackerWins ? 'attacker' : 'defender'
+                    winner: attackerWins ? 'attacker' : 'defender' as const // Type assertion for winner
                 };
 
                 // Add to battle history
