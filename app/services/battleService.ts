@@ -59,16 +59,22 @@ export const battleService = {
             console.log('Battle result received:', result);
             
             return result;
-        } catch (error: any) {
-            console.error('Battle service detailed error:', {
-                errorMessage: error.message,
-                errorCode: error.code,
-                errorName: error.name,
-                errorStack: error.stack,
+        } catch (error) {
+            // Enhanced error logging
+            const errorDetails = {
+                message: error instanceof Error ? error.message : 'Unknown error',
+                name: error instanceof Error ? error.name : 'UnknownError',
+                stack: error instanceof Error ? error.stack : undefined,
                 attackerId,
                 defenderId,
-                contractAddress: BATTLE_CONTRACT_ADDRESS
-            });
+                contractAddress: BATTLE_CONTRACT_ADDRESS,
+                error: JSON.stringify(error, Object.getOwnPropertyNames(error))
+            };
+            
+            console.error('Battle service detailed error:', errorDetails);
+            
+            // Log the full error object for debugging
+            console.error('Full error object:', error);
             
             // Fallback battle resolution
             const fallbackResult = Math.random() > 0.5;
