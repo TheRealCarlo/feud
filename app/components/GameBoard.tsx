@@ -309,6 +309,30 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
         }
     };
 
+    const refreshGameState = async () => {
+        console.log('Refreshing game state...');
+        try {
+            const { data: currentGame, error } = await supabase
+                .from('games')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (error) {
+                console.error('Error refreshing game state:', error);
+                return;
+            }
+
+            if (currentGame && 'squares' in currentGame) {
+                console.log('Refreshed game state:', currentGame);
+                setGameState(currentGame as GameState);
+            }
+        } catch (err) {
+            console.error('Error during refresh:', err);
+        }
+    };
+
     return (
         <div className="flex flex-col items-center gap-6">
             {/* Battle Result Message */}
