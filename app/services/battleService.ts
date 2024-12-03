@@ -1,8 +1,9 @@
 import { BrowserProvider, Contract } from 'ethers';
 import { Faction, GameState } from '../types/game';
+import { ethers } from 'ethers';
 
 // Test contract address for development
-const BATTLE_CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'; // Local hardhat default first address
+const BATTLE_CONTRACT_ADDRESS = '0x20aCfa11998c23896A61E467cB0F605C2d46C7B7'; // Polygon Mainnet
 
 const BATTLE_ABI = [
     {
@@ -19,7 +20,49 @@ const BATTLE_ABI = [
 
 const COOLDOWN_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
+const POLYGON_NETWORK = {
+    chainId: '0x89', // 137 in hex
+    chainName: 'Polygon Mainnet',
+    nativeCurrency: {
+        name: 'MATIC',
+        symbol: 'MATIC',
+        decimals: 18
+    },
+    rpcUrls: ['https://polygon-rpc.com'],
+    blockExplorerUrls: ['https://polygonscan.com']
+};
+
 export const battleService = {
+    async switchToPolygon() {
+        if (!window.ethereum) {
+            throw new Error('MetaMask is not installed');
+        }
+
+        try {
+            // Try to switch to Polygon network
+            await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: POLYGON_NETWORK.chainId }],
+            });
+        } catch (switchError: any) {
+            // This error code indicates that the chain has not been added to MetaMask
+            if (switchError.code === 4902) {
+                try {
+                    await window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [POLYGON_NETWORK],
+                    });
+                } catch (addError) {
+                    console.error('Failed to add Polygon network:', addError);
+                    throw new Error('Failed to add Polygon network to MetaMask');
+                }
+            } else {
+                console.error('Failed to switch to Polygon network:', switchError);
+                throw new Error('Failed to switch to Polygon network');
+            }
+        }
+    },
+
     async initiateBattle(
         provider: BrowserProvider,
         attackerId: string,
@@ -28,11 +71,13 @@ export const battleService = {
         try {
             // Verify network and log details
             const network = await provider.getNetwork();
-            console.log('Network details:', {
-                chainId: network.chainId,
-                name: network.name,
-                provider: provider.constructor.name
-            });
+            console.log('Connected to network:', network);
+
+            if (network.chainId !== 137n) { // 137 is the chainId for Polygon Mainnet
+                console.log('Wrong network, switching to Polygon...');
+                await this.switchToPolygon();
+                throw new Error('Please refresh the page after switching networks');
+            }
 
             // Get signer and address
             const signer = await provider.getSigner();
@@ -52,7 +97,7 @@ export const battleService = {
             const contract = new Contract(
                 BATTLE_CONTRACT_ADDRESS,
                 BATTLE_ABI,
-                signer
+                provider
             );
 
             // Log battle parameters

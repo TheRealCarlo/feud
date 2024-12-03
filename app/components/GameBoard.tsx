@@ -373,28 +373,28 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
     };
 
     return (
-        <div className="flex flex-col items-center gap-6">
+        <div className="flex flex-col items-center gap-4 p-2 sm:p-4 md:p-6">
             {/* Battle Result Message */}
             {battleResult && (
-                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 bg-gray-800 text-white rounded-lg shadow-lg z-50 animate-fade-in">
+                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-gray-800 text-white rounded-lg shadow-lg z-50 animate-fade-in text-sm sm:text-base">
                     {battleResult}
                 </div>
             )}
 
             {/* Timer Display */}
-            <div className="px-4 py-2 bg-gray-800 rounded-lg text-white font-mono">
+            <div className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-800 rounded-lg text-white font-mono text-sm sm:text-base">
                 Time Remaining: {timeLeft}
             </div>
 
             {/* Battle Status */}
             {isBattling && (
-                <div className="px-4 py-2 bg-yellow-600 text-white rounded-lg animate-pulse">
+                <div className="px-3 py-1.5 sm:px-4 sm:py-2 bg-yellow-600 text-white rounded-lg animate-pulse text-sm sm:text-base">
                     Battle in progress...
                 </div>
             )}
 
             {/* Game Board */}
-            <div className="grid grid-cols-8 gap-1 p-4 bg-gray-800 rounded-lg shadow-lg">
+            <div className="grid grid-cols-8 gap-0.5 sm:gap-1 p-2 sm:p-4 bg-gray-800 rounded-lg shadow-lg">
                 {Array.from({ length: 64 }).map((_, index) => {
                     const square = gameState.squares[index] || { id: index, bear: null, faction: null };
                     return (
@@ -402,7 +402,8 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                             key={index}
                             onClick={() => handleSquareClick(index)}
                             className={`
-                                w-16 h-16 bg-gray-700 rounded-sm cursor-pointer
+                                w-8 h-8 sm:w-12 sm:h-12 md:w-16 md:h-16 
+                                bg-gray-700 rounded-sm cursor-pointer
                                 hover:bg-gray-600 transition-all duration-200
                                 border-2 ${square.faction ? getFactionColor(square.faction) : 'border-transparent'}
                                 ${selectedSquareId === index ? 'ring-2 ring-yellow-400' : ''}
@@ -417,7 +418,7 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                                         alt={square.bear.metadata.name}
                                         className="w-full h-full object-cover rounded-sm"
                                     />
-                                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 truncate">
+                                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-[8px] sm:text-xs p-0.5 sm:p-1 truncate">
                                         {square.bear.metadata.name}
                                     </div>
                                 </div>
@@ -428,14 +429,14 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
             </div>
 
             {/* Game Stats */}
-            <div className="flex gap-4 justify-center text-sm">
-                <div className="px-4 py-2 bg-gray-800 rounded-lg">
+            <div className="flex gap-2 sm:gap-4 justify-center text-xs sm:text-sm">
+                <div className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-800 rounded-lg">
                     <span className="text-gray-400">Your Bears:</span>
                     <span className="ml-2 text-white">
                         {gameState.squares.filter(s => s.faction === userFaction).length}
                     </span>
                 </div>
-                <div className="px-4 py-2 bg-gray-800 rounded-lg">
+                <div className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-800 rounded-lg">
                     <span className="text-gray-400">Territory:</span>
                     <span className="ml-2 text-white">
                         {Math.round((gameState.squares.filter(s => s.faction === userFaction).length / 64) * 100)}%
@@ -443,19 +444,24 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                 </div>
             </div>
 
+            {/* Bear Selector Modal */}
             {showBearSelector && (
-                <BearSelector
-                    nfts={nfts.filter(bear => 
-                        !gameState?.used_bears?.includes(bear.tokenId)
-                    )}
-                    onSelect={handleBearSelect}
-                    onClose={() => {
-                        setShowBearSelector(false);
-                        setSelectedSquareId(null);
-                    }}
-                    gameState={gameState}
-                    isBattle={!!gameState.squares[selectedSquareId!]?.faction}
-                />
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-gray-800 rounded-lg p-4 w-full max-w-md max-h-[80vh] overflow-y-auto">
+                        <BearSelector
+                            nfts={nfts.filter(bear => 
+                                !gameState?.used_bears?.includes(bear.tokenId)
+                            )}
+                            onSelect={handleBearSelect}
+                            onClose={() => {
+                                setShowBearSelector(false);
+                                setSelectedSquareId(null);
+                            }}
+                            gameState={gameState}
+                            isBattle={!!gameState.squares[selectedSquareId!]?.faction}
+                        />
+                    </div>
+                </div>
             )}
         </div>
     );

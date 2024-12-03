@@ -1,124 +1,155 @@
 import { useState, useEffect } from 'react';
 import { GameState } from '../types/game';
-import { battleService } from '../services/battleService';
 
 interface BearSelectorProps {
     nfts: any[];
     onSelect: (bear: any) => void;
     onClose: () => void;
     gameState: GameState;
-    isBattle?: boolean;
+    isBattle: boolean;
 }
 
-export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle = false }: BearSelectorProps) {
-    const [availableBears, setAvailableBears] = useState(nfts);
+export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: BearSelectorProps) {
+    const [cooldowns, setCooldowns] = useState<{ [key: string]: number }>({});
+    const [allBears, setAllBears] = useState<any[]>([]);
 
-    // Update available bears when cooldowns change
     useEffect(() => {
-        const now = Date.now();
-        const filteredBears = nfts.filter(bear => {
-            const cooldown = battleService.getBearCooldown(gameState, bear.tokenId);
-            return !cooldown || cooldown <= now;
-        });
-        setAvailableBears(filteredBears);
-
-        // Set up interval to check cooldowns
-        const interval = setInterval(() => {
-            const updatedBears = nfts.filter(bear => {
-                const cooldown = battleService.getBearCooldown(gameState, bear.tokenId);
-                return !cooldown || cooldown <= now;
+        // Combine available NFTs with those in cooldown
+        const allBearsMap = new Map();
+        
+        // Add available NFTs
+        nfts.forEach(bear => allBearsMap.set(bear.tokenId, bear));
+        
+        // Add bears in cooldown
+        if (gameState?.cooldowns && Array.isArray(gameState.cooldowns)) {
+            gameState.cooldowns.forEach(cooldown => {
+                if (cooldown?.bear) {
+                    allBearsMap.set(cooldown.bear.tokenId, cooldown.bear);
+                }
             });
-            setAvailableBears(updatedBears);
-        }, 1000); // Check every second
+        }
 
+        setAllBears(Array.from(allBearsMap.values()));
+    }, [nfts, gameState?.cooldowns]);
+
+    useEffect(() => {
+        const updateCooldowns = () => {
+            const newCooldowns: { [key: string]: number } = {};
+            const now = Date.now();
+
+            if (gameState?.cooldowns && Array.isArray(gameState.cooldowns)) {
+                gameState.cooldowns.forEach(cooldown => {
+                    if (cooldown && typeof cooldown.endTime === 'number' && cooldown.tokenId) {
+                        const timeLeft = cooldown.endTime - now;
+                        if (timeLeft > 0) {
+                            newCooldowns[cooldown.tokenId] = timeLeft;
+                        }
+                    }
+                });
+            }
+
+            setCooldowns(newCooldowns);
+        };
+
+        updateCooldowns();
+        const interval = setInterval(updateCooldowns, 1000);
         return () => clearInterval(interval);
-    }, [nfts, gameState.cooldowns]);
+    }, [gameState?.cooldowns]);
+
+    const formatTime = (milliseconds: number) => {
+        const totalSeconds = Math.floor(milliseconds / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        } else if (minutes > 0) {
+            return `${minutes}m ${seconds}s`;
+        } else {
+            return `${seconds}s`;
+        }
+    };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-100 dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
-                <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {isBattle ? 'Select Bear for Battle' : 'Select Bear for Placement'}
-                    </h3>
-                    <button 
-                        onClick={onClose}
-                        className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                    >
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
+        <div className="flex flex-col items-center gap-4">
+            <h2 className="text-lg font-bold text-white">
+                {isBattle ? 'Select Bear for Battle' : 'Select Bear for Placement'}
+            </h2>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto p-2">
+                {allBears.map(bear => {
+                    const hasCooldown = cooldowns[bear.tokenId] > 0;
+                    const isUsed = gameState?.used_bears?.includes(bear.tokenId);
+                    const isDisabled = hasCooldown || isUsed;
 
-                <div className="p-6 overflow-y-auto max-h-[calc(80vh-100px)]">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {nfts.map((bear) => {
-                            const cooldownUntil = battleService.getBearCooldown(gameState, bear.tokenId);
-                            const isOnCooldown = cooldownUntil !== null && cooldownUntil > Date.now();
-                            const cooldownTime = isOnCooldown ? battleService.formatCooldownTime(cooldownUntil) : '';
-
-                            return (
-                                <div
-                                    key={bear.tokenId}
-                                    onClick={() => !isOnCooldown && onSelect(bear)}
-                                    className={`
-                                        relative bg-white dark:bg-gray-700 rounded-lg p-3
-                                        border border-gray-200 dark:border-gray-600
-                                        ${!isOnCooldown && 'hover:shadow-lg transition-all duration-200 cursor-pointer'}
-                                    `}
-                                >
-                                    <div className="aspect-square overflow-hidden rounded-md mb-2 relative">
-                                        <img 
-                                            src={bear.metadata.image} 
-                                            alt={bear.metadata.name}
-                                            className="w-full h-full object-cover"
-                                        />
-                                        {isOnCooldown && (
-                                            <div className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center">
-                                                <span className="text-white font-bold text-lg mb-1">COOLDOWN</span>
-                                                <span className="text-white text-sm bg-red-500 px-2 py-1 rounded">
-                                                    {cooldownTime}
-                                                </span>
+                    return (
+                        <div
+                            key={bear.tokenId}
+                            className={`
+                                relative bg-gray-700 rounded-lg p-2 
+                                ${isDisabled 
+                                    ? 'opacity-75 cursor-not-allowed' 
+                                    : 'cursor-pointer hover:bg-gray-600 hover:transform hover:scale-105'}
+                                transition-all duration-200
+                            `}
+                            onClick={() => !isDisabled && onSelect(bear)}
+                        >
+                            <div className="relative">
+                                <img 
+                                    src={bear.metadata.image} 
+                                    alt={bear.metadata.name} 
+                                    className="w-full h-24 object-cover rounded-md"
+                                />
+                                {isDisabled && (
+                                    <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center rounded-md">
+                                        {hasCooldown ? (
+                                            <div className="text-center">
+                                                <div className="text-yellow-400 text-sm font-medium mb-1">
+                                                    Cooldown
+                                                </div>
+                                                <div className="text-white text-xs">
+                                                    {formatTime(cooldowns[bear.tokenId])}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-red-400 text-sm font-medium">
+                                                In Battle
                                             </div>
                                         )}
                                     </div>
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between items-start">
-                                            <h4 className="font-medium text-gray-900 dark:text-white truncate">
-                                                {bear.metadata.name}
-                                            </h4>
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                #{bear.tokenId}
-                                            </span>
-                                        </div>
-                                        {isOnCooldown && (
-                                            <div className="flex items-center gap-1 text-red-500">
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" 
-                                                    />
-                                                </svg>
-                                                <span className="text-sm font-medium">Resting</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Footer with info */}
-                <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800">
-                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                        {isBattle 
-                            ? "Bears need 2 hours to rest after losing a battle"
-                            : "Select a bear to place on the board"
-                        }
-                    </p>
-                </div>
+                                )}
+                            </div>
+                            
+                            <div className="mt-2 text-center text-white text-sm truncate">
+                                {bear.metadata.name}
+                            </div>
+                            
+                            <div className={`
+                                mt-1 text-center text-xs font-medium
+                                ${hasCooldown 
+                                    ? 'text-yellow-400' 
+                                    : isUsed 
+                                        ? 'text-red-400'
+                                        : 'text-green-400'}
+                            `}>
+                                {hasCooldown 
+                                    ? 'On Cooldown' 
+                                    : isUsed 
+                                        ? 'In Battle'
+                                        : 'Ready'}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
+
+            <button
+                onClick={onClose}
+                className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            >
+                Close
+            </button>
         </div>
     );
-} 
+}
