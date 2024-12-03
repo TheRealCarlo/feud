@@ -65,14 +65,18 @@ export function GameBoard({ userFaction, nfts, onGameStart }: GameBoardProps) {
     }, []);
 
     const handleBattle = async (squareId: number) => {
-        if (!gameState || !window.ethereum) return;
+        const ethereum = window.ethereum;
+        if (!gameState || !ethereum) {
+            alert('Please install MetaMask to participate in battles!');
+            return;
+        }
 
         const square = gameState.squares[squareId];
         if (!square.bear) return;
 
         setIsBattling(true);
         try {
-            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const provider = new ethers.providers.Web3Provider(ethereum);
             
             // Find the selected bear for the attack
             setSelectedSquareId(squareId);
