@@ -68,7 +68,7 @@ export const battleService = {
 
         // Remove the bear from used_bears if it exists there
         if (newGameState.used_bears) {
-            newGameState.used_bears = newGameState.used_bears.filter(id => id !== bearId);
+            newGameState.used_bears = newGameState.used_bears.filter((id: string) => id !== bearId);
         }
 
         console.log('Updated game state after battle loss:', newGameState);
