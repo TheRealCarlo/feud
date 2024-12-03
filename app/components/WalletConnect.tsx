@@ -236,7 +236,12 @@ export function WalletConnect({ onFactionDetermined, onNftsLoaded }: {
         
         if (chainId !== 1) { // Ethereum Mainnet
             try {
-                await window.ethereum.request({
+                const ethereum = window.ethereum;
+                if (!ethereum) {
+                    throw new Error('MetaMask not installed');
+                }
+                
+                await ethereum.request({
                     method: 'wallet_switchEthereumChain',
                     params: [{ chainId: '0x1' }],
                 });
