@@ -1,8 +1,17 @@
 export type Faction = 'IRON' | 'GEO' | 'TECH' | 'PAW';
 
-export interface BearState {
+export interface PlacedBear {
     tokenId: string;
-    cooldownUntil: number | null;  // Timestamp when cooldown ends
+    metadata: {
+        name: string;
+        image: string;
+    };
+}
+
+export interface Square {
+    id: number;
+    bear: PlacedBear | null;
+    faction: Faction | null;
 }
 
 export interface GameState {
@@ -11,19 +20,12 @@ export interface GameState {
     endTime: number;
     squares: Square[];
     usedBears: string[];
-    cooldowns: BearState[];  // Track bear cooldowns
+    cooldowns: BearState[];
 }
 
-export interface Square {
-    id: number;
-    bear: {
-        tokenId: string;
-        metadata: {
-            name: string;
-            image: string;
-        };
-    } | null;
-    faction: Faction | null;
+export interface BearState {
+    tokenId: string;
+    cooldownUntil: number | null;
 }
 
 export interface BattleResult {
