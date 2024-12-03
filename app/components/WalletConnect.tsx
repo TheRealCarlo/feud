@@ -20,10 +20,10 @@ const FACTION_ABI = [
 
 const getFactionName = (factionId: number): Faction => {
     switch (factionId) {
-        case 0: return 'IRON';  // IronBearz
-        case 1: return 'GEO';   // Geoscapez
-        case 2: return 'TECH';  // Techheadz
+        case 1: return 'IRON';  // IronBearz
+        case 2: return 'GEO';   // Geoscapez
         case 3: return 'PAW';   // Pawpunkz
+        case 4: return 'TECH';  // Techheadz
         default: throw new Error('Invalid faction ID');
     }
 };

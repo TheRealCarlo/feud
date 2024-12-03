@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { gameService } from '../services/gameService';
 import { OptimizedImage } from './OptimizedImage';
+import { supabase } from '../lib/supabase';
 import { Faction } from '../types/game';
 
 interface BearStats {
@@ -10,26 +10,7 @@ interface BearStats {
     faction: Faction;
     wins: number;
     losses: number;
-    winRate: number;
-}
-
-interface BearMetadata {
-    name: string;
-    image: string;
-}
-
-interface BattleParticipant {
-    tokenId: string;
-    name: string;
-    metadata: BearMetadata;
-    faction: Faction;
-}
-
-interface Battle {
-    attacker: BattleParticipant;
-    defender: BattleParticipant;
-    winner: 'attacker' | 'defender';
-    timestamp: number;
+    win_rate: number;
 }
 
 export default function Leaderboard() {
@@ -37,73 +18,54 @@ export default function Leaderboard() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const calculateLeaderboard = () => {
-            const battles = gameService.getBattleHistory() as Battle[];
-            const bearStats = new Map<string, BearStats>();
+        const fetchLeaderboard = async () => {
+            try {
+                // Fetch the leaderboard data from the leaderboard view/table
+                const { data, error } = await supabase
+                    .from('leaderboard')
+                    .select('*')
+                    .order('win_rate', { ascending: false })
+                    .order('wins', { ascending: false })
+                    .limit(10);
 
-            // Process all battles
-            battles.forEach(battle => {
-                // Process attacker
-                if (!bearStats.has(battle.attacker.tokenId)) {
-                    bearStats.set(battle.attacker.tokenId, {
-                        tokenId: battle.attacker.tokenId,
-                        name: battle.attacker.name,
-                        image: battle.attacker.metadata?.image || null,
-                        faction: battle.attacker.faction,
-                        wins: 0,
-                        losses: 0,
-                        winRate: 0
-                    });
+                if (error) {
+                    throw error;
                 }
 
-                // Process defender
-                if (!bearStats.has(battle.defender.tokenId)) {
-                    bearStats.set(battle.defender.tokenId, {
-                        tokenId: battle.defender.tokenId,
-                        name: battle.defender.name,
-                        image: battle.defender.metadata?.image || null,
-                        faction: battle.defender.faction,
-                        wins: 0,
-                        losses: 0,
-                        winRate: 0
-                    });
+                if (data) {
+                    setTopBears(data);
                 }
-
-                // Update win/loss records
-                const attackerStats = bearStats.get(battle.attacker.tokenId)!;
-                const defenderStats = bearStats.get(battle.defender.tokenId)!;
-
-                if (battle.winner === 'attacker') {
-                    attackerStats.wins++;
-                    defenderStats.losses++;
-                } else {
-                    attackerStats.losses++;
-                    defenderStats.wins++;
-                }
-
-                // Calculate win rates
-                attackerStats.winRate = (attackerStats.wins / (attackerStats.wins + attackerStats.losses)) * 100;
-                defenderStats.winRate = (defenderStats.wins / (defenderStats.wins + defenderStats.losses)) * 100;
-            });
-
-            // Convert to array and sort by win rate
-            const sortedBears = Array.from(bearStats.values())
-                .sort((a, b) => {
-                    if (b.winRate !== a.winRate) {
-                        return b.winRate - a.winRate;
-                    }
-                    if (b.wins !== a.wins) {
-                        return b.wins - a.wins;
-                    }
-                    return (b.wins + b.losses) - (a.wins + a.losses);
-                })
-                .slice(0, 10); // Get top 10
-
-            setTopBears(sortedBears);
-            setIsLoading(false);
+            } catch (error) {
+                console.error('Error fetching leaderboard:', error);
+            } finally {
+                setIsLoading(false);
+            }
         };
 
-        calculateLeaderboard();
+        // Initial fetch
+        fetchLeaderboard();
+
+        // Set up real-time subscription for leaderboard updates
+        const leaderboardSubscription = supabase
+            .channel('leaderboard_changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'leaderboard'
+                },
+                () => {
+                    // Refresh the leaderboard when changes occur
+                    fetchLeaderboard();
+                }
+            )
+            .subscribe();
+
+        // Cleanup subscription
+        return () => {
+            leaderboardSubscription.unsubscribe();
+        };
     }, []);
 
     if (isLoading) {
@@ -159,7 +121,7 @@ export default function Leaderboard() {
                                 <span className="text-red-500 font-medium">{bear.losses}L</span>
                             </div>
                             <div className="text-sm text-gray-400">
-                                {bear.winRate.toFixed(1)}% Win Rate
+                                {bear.win_rate.toFixed(1)}% Win Rate
                             </div>
                         </div>
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { GameState } from '../types/game';
 import { OptimizedImage } from './OptimizedImage';
+import { supabase } from '../lib/supabase';
 
 interface BearSelectorProps {
     nfts: any[];
@@ -10,9 +11,18 @@ interface BearSelectorProps {
     isBattle: boolean;
 }
 
+interface Cooldown {
+    token_id: string;
+    end_time: number;
+    wallet_address: string;
+    created_at?: string;
+}
+
 export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: BearSelectorProps) {
     const [allBears, setAllBears] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         console.log('BearSelector Data:', {
@@ -73,6 +83,59 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: B
         setIsLoading(false);
     }, [nfts, gameState?.cooldowns, gameState?.used_bears]);
 
+    useEffect(() => {
+        const fetchCooldowns = async () => {
+            try {
+                console.log('Fetching cooldowns...');
+                const { data, error } = await supabase
+                    .from('cooldowns')
+                    .select('*')
+                    .gt('end_time', Math.floor(Date.now() / 1000));
+
+                if (error) {
+                    console.error('Error fetching cooldowns:', error);
+                    return;
+                }
+
+                console.log('Fetched cooldowns:', data);
+                setCooldowns(data || []);
+            } catch (err) {
+                console.error('Error in fetchCooldowns:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchCooldowns();
+        const intervalId = setInterval(fetchCooldowns, 30000); // Refresh every 30 seconds
+        return () => clearInterval(intervalId);
+    }, []);
+
+    const isInCooldown = (tokenId: string) => {
+        const cooldown = cooldowns.find(c => c.token_id === String(tokenId));
+        if (!cooldown) return false;
+
+        const isStillInCooldown = cooldown.end_time > Math.floor(Date.now() / 1000);
+        console.log(`Cooldown check for ${tokenId}:`, {
+            endTime: new Date(cooldown.end_time * 1000).toISOString(),
+            now: new Date().toISOString(),
+            isInCooldown: isStillInCooldown
+        });
+        return isStillInCooldown;
+    };
+
+    const getCooldownTimeRemaining = (tokenId: string) => {
+        const cooldown = cooldowns.find(c => c.token_id === String(tokenId));
+        if (!cooldown) return null;
+        
+        const remainingTime = (cooldown.end_time * 1000) - Date.now();
+        if (remainingTime <= 0) return null;
+
+        const hours = Math.floor(remainingTime / (1000 * 60 * 60));
+        const minutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+        return `${hours}h ${minutes}m`;
+    };
+
     // Add a refresh interval to update cooldown timers
     useEffect(() => {
         const interval = setInterval(() => {
@@ -102,35 +165,14 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: B
     }
 
     const renderBearCard = (bear: any) => {
-        // Check if bear is in cooldown from the gameState
-        const cooldown = gameState?.cooldowns?.find(
-            cd => String(cd.tokenId) === String(bear.tokenId)
-        );
-        
+        const inCooldown = isInCooldown(bear.tokenId);
+        const cooldownTime = getCooldownTimeRemaining(bear.tokenId);
+
         // Check if bear is in battle
         const isInBattle = gameState?.used_bears?.includes(String(bear.tokenId));
-        
-        // Calculate cooldown status
-        const now = Date.now();
-        const TWO_HOURS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
-        
-        // A bear is in cooldown if:
-        // 1. It has an explicit cooldown in gameState, OR
-        // 2. It was in battle and lost (handled by gameState.cooldowns)
-        const isInCooldown = cooldown && cooldown.timestamp > now;
-        const cooldownEndTime = cooldown ? cooldown.timestamp : 0;
-        
-        const isDisabled = isInCooldown || isInBattle;
 
-        // Format cooldown time remaining
-        const formatTimeRemaining = (timestamp: number) => {
-            const timeLeft = timestamp - now;
-            if (timeLeft <= 0) return 'Ready';
-            
-            const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-            return `${hours}h ${minutes}m`;
-        };
+        // Determine if the bear is disabled
+        const isDisabled = inCooldown || isInBattle;
 
         return (
             <div
@@ -153,13 +195,13 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: B
                     />
                     {isDisabled && (
                         <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center rounded-md">
-                            {isInCooldown ? (
+                            {inCooldown ? (
                                 <div className="text-center">
                                     <div className="text-yellow-400 text-sm font-medium mb-1">
                                         Cooldown
                                     </div>
                                     <div className="text-white text-xs">
-                                        {formatTimeRemaining(cooldownEndTime)}
+                                        {cooldownTime}
                                     </div>
                                 </div>
                             ) : isInBattle && (
@@ -177,14 +219,14 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: B
                 
                 <div className={`
                     mt-1 text-center text-xs font-medium
-                    ${isInCooldown 
+                    ${inCooldown 
                         ? 'text-yellow-400' 
                         : isInBattle 
                             ? 'text-red-400'
                             : 'text-green-400'}
                 `}>
-                    {isInCooldown 
-                        ? `Cooldown: ${formatTimeRemaining(cooldownEndTime)}` 
+                    {inCooldown 
+                        ? `Cooldown: ${cooldownTime}` 
                         : isInBattle 
                             ? 'In Battle'
                             : 'Ready'}
