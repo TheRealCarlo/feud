@@ -5,7 +5,7 @@ export interface BearInventoryProps {
     userFaction: Faction;
 }
 
-export function BearInventory({ nfts, userFaction }: BearInventoryProps) {
+export default function BearInventory({ nfts, userFaction }: BearInventoryProps) {
     return (
         <div className="container mx-auto p-4">
             <h2 className="text-2xl font-bold text-white mb-6">Your Bear Collection</h2>

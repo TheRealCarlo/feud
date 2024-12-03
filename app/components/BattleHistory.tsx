@@ -6,7 +6,7 @@ export interface BattleHistoryProps {
     userFaction: Faction;
 }
 
-export function BattleHistory({ userFaction }: BattleHistoryProps) {
+export default function BattleHistory({ userFaction }: BattleHistoryProps) {
     const [battles, setBattles] = useState<BattleResult[]>([]);
 
     useEffect(() => {

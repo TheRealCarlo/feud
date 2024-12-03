@@ -26,7 +26,7 @@ const getFactionColor = (faction: Faction): string => {
     }
 };
 
-export function GameBoard({ userFaction, nfts, onGameStart }: GameBoardProps) {
+export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardProps) {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [timeLeft, setTimeLeft] = useState<string>('');
     const [selectedSquareId, setSelectedSquareId] = useState<number | null>(null);

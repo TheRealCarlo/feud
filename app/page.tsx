@@ -1,12 +1,23 @@
 'use client'
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { WalletConnect } from './components/WalletConnect'
-import { GameBoard } from './components/GameBoard'
 import { Navigation } from './components/Navigation'
-import { BearInventory } from './components/BearInventory'
-import { BattleHistory } from './components/BattleHistory'
 import { Faction } from './types/game'
+
+// Dynamically import heavy components
+const GameBoard = dynamic(() => import('./components/GameBoard'), {
+    loading: () => <div className="text-white text-center p-4">Loading game board...</div>
+});
+
+const BearInventory = dynamic(() => import('./components/BearInventory'), {
+    loading: () => <div className="text-white text-center p-4">Loading inventory...</div>
+});
+
+const BattleHistory = dynamic(() => import('./components/BattleHistory'), {
+    loading: () => <div className="text-white text-center p-4">Loading battle history...</div>
+});
 
 type View = 'game' | 'inventory' | 'history'
 

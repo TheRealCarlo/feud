@@ -1,6 +1,5 @@
 import { BrowserProvider, Contract } from 'ethers';
 import { Faction, GameState } from '../types/game';
-import dynamic from 'next/dynamic';
 
 const BATTLE_CONTRACT_ADDRESS = '0x20aCfa11998c23896A61E467cB0F605C2d46C7B7';
 
@@ -19,10 +18,6 @@ const BATTLE_ABI = [
 
 const COOLDOWN_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
-const BearSelector = dynamic(() => import('./components/BearSelector'), {
-    loading: () => <div>Loading...</div>
-});
-
 export const battleService = {
     async initiateBattle(
         provider: BrowserProvider,
@@ -30,38 +25,45 @@ export const battleService = {
         defenderId: string
     ): Promise<boolean> {
         try {
-            // Log initial parameters
-            console.log('Battle initialization parameters:', {
-                attackerId,
-                defenderId,
-                contractAddress: BATTLE_CONTRACT_ADDRESS,
-                providerNetwork: await provider.getNetwork()
+            // Verify network first
+            const network = await provider.getNetwork();
+            console.log('Current network:', {
+                chainId: network.chainId,
+                name: network.name
             });
 
-            // Verify provider and network
-            const network = await provider.getNetwork();
-            console.log('Current network:', network);
+            // Get signer
+            const signer = await provider.getSigner();
+            console.log('Signer address:', await signer.getAddress());
 
-            // Create contract instance
+            // Create contract instance with signer
             const contract = new Contract(
                 BATTLE_CONTRACT_ADDRESS,
                 BATTLE_ABI,
-                provider
+                signer
             );
-            console.log('Contract instance created');
+
+            // Verify contract exists
+            const code = await provider.getCode(BATTLE_CONTRACT_ADDRESS);
+            if (code === '0x') {
+                throw new Error(`No contract found at ${BATTLE_CONTRACT_ADDRESS}`);
+            }
+
+            console.log('Contract instance created and verified');
 
             // Format token IDs
             const attacker = BigInt(attackerId);
             const defender = BigInt(defenderId);
-            console.log('Formatted IDs:', {
+            console.log('Battle parameters:', {
                 attacker: attacker.toString(),
-                defender: defender.toString()
+                defender: defender.toString(),
+                contractAddress: BATTLE_CONTRACT_ADDRESS
             });
 
             // Attempt contract call
-            console.log('Attempting contract call...');
+            console.log('Calling contract...');
             const result = await contract.calculateBattleOutcome(attacker, defender);
-            console.log('Battle result received:', result);
+            console.log('Battle result:', result);
             
             return result;
         } catch (error) {
@@ -73,18 +75,18 @@ export const battleService = {
                 attackerId,
                 defenderId,
                 contractAddress: BATTLE_CONTRACT_ADDRESS,
-                error: JSON.stringify(error, Object.getOwnPropertyNames(error))
+                errorObject: error,
+                timestamp: new Date().toISOString()
             };
             
-            console.error('Battle service detailed error:', errorDetails);
+            console.error('Battle service error:', errorDetails);
             
-            // Log the full error object for debugging
-            console.error('Full error object:', error);
+            // For development/debugging
+            console.error('Full error:', error);
             
-            // Fallback battle resolution
-            const fallbackResult = Math.random() > 0.5;
-            console.log('Using fallback battle resolution:', fallbackResult);
-            return fallbackResult;
+            // Use fallback for now
+            console.log('Using fallback battle resolution');
+            return Math.random() > 0.5;
         }
     },
 
