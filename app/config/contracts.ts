@@ -38,35 +38,6 @@ export const CONTRACTS = {
     }
 } as const;
 
-// Update your battleService to use these configurations
-export const getBattleContract = async (provider: any) => {
-    // Check if we're on the correct network
-    const network = await provider.getNetwork();
-    const chainId = network.chainId;
-
-    if (chainId.toString() !== NETWORKS.polygon.chainId) {
-        throw new Error('Please switch to Polygon network to interact with the Battle contract');
-    }
-
-    return new Contract(
-        CONTRACTS.BATTLE.address,
-        BATTLE_CONTRACT_ABI,
-        provider
-    );
-};
-
-// Similarly for the Bears contract
-export const getBearsContract = async (provider: any) => {
-    const network = await provider.getNetwork();
-    const chainId = network.chainId;
-
-    if (chainId.toString() !== NETWORKS.ethereum.chainId) {
-        throw new Error('Please switch to Ethereum Mainnet to interact with the Bears contract');
-    }
-
-    return new Contract(
-        CONTRACTS.BEARS.address,
-        BEARS_CONTRACT_ABI,
-        provider
-    );
-}; 
+// For now, we'll just export the addresses since we're using the placeholder battle algorithm
+export const { address: BATTLE_CONTRACT_ADDRESS } = CONTRACTS.BATTLE;
+export const { address: BEARS_CONTRACT_ADDRESS } = CONTRACTS.BEARS; 
