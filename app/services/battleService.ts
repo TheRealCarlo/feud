@@ -134,10 +134,20 @@ export const battleService = {
                 timestamp: new Date().toISOString()
             });
 
-            // Fallback to random outcome for development
-            const fallbackResult = Math.random() > 0.5;
-            console.log('Using fallback battle resolution:', fallbackResult);
-            return fallbackResult;
+            // Placeholder battle algorithm
+            const randomNumber = Math.random(); // Generate number between 0 and 1
+            
+            // 60% chance for attacker to win
+            const attackerWins = randomNumber < 0.6;
+            
+            console.log('🎲 Battle Result:', {
+                attackerId,
+                defenderId,
+                randomNumber,
+                winner: attackerWins ? 'Attacker' : 'Defender'
+            });
+
+            return attackerWins;
         }
     },
 
