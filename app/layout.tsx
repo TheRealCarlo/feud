@@ -4,8 +4,8 @@ import { Inter } from 'next/font/google'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'Brawler Bearz: Capture the Space',
-  description: 'An 8-bit style NFT battling game',
+  title: 'Brawler Bearz Feud',
+  description: 'A strategic game for Brawler Bearz holders',
 }
 
 export default function RootLayout({
@@ -15,7 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-black text-white`}>{children}</body>
+      <body className={`${inter.className} bg-black text-white antialiased`}>
+        {children}
+      </body>
     </html>
   )
 }

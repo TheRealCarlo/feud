@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { WalletConnect } from './components/WalletConnect'
 import { Navigation } from './components/Navigation'
 import { Faction } from './types/game'
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Dynamically import heavy components
 const GameBoard = dynamic(() => import('./components/GameBoard'), {
@@ -66,43 +67,47 @@ export default function Home() {
   };
 
   return (
-    <div 
-      className="min-h-screen relative"
-      style={{
-        backgroundImage: "url('/background.png')",
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      }}
-    >
-      <div className="absolute inset-0 bg-black bg-opacity-50" />
-      
-      <div className="relative z-10">
-        <div className="container mx-auto px-4 py-8">
-          <h1 className="text-5xl font-bold text-center mb-8 text-white tracking-tight drop-shadow-lg">
-            Battle for NeoCity Town Square
-          </h1>
+    <ErrorBoundary>
+      <main className="min-h-screen bg-gray-900 text-white p-8">
+        <div 
+          className="min-h-screen relative"
+          style={{
+            backgroundImage: "url('/background.png')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          }}
+        >
+          <div className="absolute inset-0 bg-black bg-opacity-50" />
+          
+          <div className="relative z-10">
+            <div className="container mx-auto px-4 py-8">
+              <h1 className="text-5xl font-bold text-center mb-8 text-white tracking-tight drop-shadow-lg">
+                Battle for NeoCity Town Square
+              </h1>
 
-          <WalletConnect 
-            onFactionDetermined={handleFactionDetermined}
-            onNftsLoaded={setNfts}
-          />
-
-          {userFaction && (
-            <div className="mt-8">
-              <Navigation
-                userFaction={userFaction}
-                activeView={activeView}
-                onViewChange={setActiveView}
+              <WalletConnect 
+                onFactionDetermined={handleFactionDetermined}
+                onNftsLoaded={setNfts}
               />
-              <div className="mt-8">
-                {renderActiveView()}
-              </div>
+
+              {userFaction && (
+                <div className="mt-8">
+                  <Navigation
+                    userFaction={userFaction}
+                    activeView={activeView}
+                    onViewChange={setActiveView}
+                  />
+                  <div className="mt-8">
+                    {renderActiveView()}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
-    </div>
+      </main>
+    </ErrorBoundary>
   )
 }
 

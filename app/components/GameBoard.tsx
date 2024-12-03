@@ -6,6 +6,12 @@ import { gameService } from '../services/gameService';
 import { battleService } from '../services/battleService';
 import { supabase } from '../lib/supabase'
 
+declare global {
+    interface Window {
+        ethereum?: any;
+    }
+}
+
 interface GameBoardProps {
     userFaction: Faction;
     nfts: any[];
@@ -28,10 +34,40 @@ const getFactionColor = (faction: Faction): string => {
 };
 
 const getProvider = async (): Promise<BrowserProvider> => {
-    if (!window.ethereum) {
-        throw new Error('MetaMask is not installed');
+    // Wait for window.ethereum to be injected
+    const waitForEthereum = async (retries = 5): Promise<any> => {
+        if (typeof window === 'undefined') return null;
+        
+        if (window.ethereum) {
+            return window.ethereum;
+        }
+
+        if (retries === 0) {
+            throw new Error('MetaMask not detected. Please install MetaMask.');
+        }
+
+        // Wait for 1 second before trying again
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return waitForEthereum(retries - 1);
+    };
+
+    try {
+        const ethereum = await waitForEthereum();
+        if (!ethereum) {
+            throw new Error('No ethereum provider found');
+        }
+        
+        // Create provider with safety checks
+        const provider = new BrowserProvider(ethereum);
+        
+        // Test the connection
+        await provider.getNetwork();
+        
+        return provider;
+    } catch (error) {
+        console.error('Error getting provider:', error);
+        throw new Error('Failed to connect to Ethereum provider. Please check your MetaMask connection.');
     }
-    return new BrowserProvider(window.ethereum);
 };
 
 export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardProps) {

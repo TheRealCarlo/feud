@@ -2,28 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-@font-face {
-  font-family: 'PixelFont';
-  src: url('/fonts/PressStart2P-Regular.ttf') format('truetype');
+:root {
+    --foreground-rgb: 255, 255, 255;
+    --background-rgb: 0, 0, 0;
 }
 
 body {
-  @apply bg-gray-900 text-white;
+    color: rgb(var(--foreground-rgb));
+    background: rgb(var(--background-rgb));
 }
 
-.pixel-text {
-  font-family: 'PixelFont', sans-serif;
-  text-shadow: 2px 2px 0 #000;
+/* Ensure consistent font loading */
+@font-face {
+    font-display: swap;
 }
 
-.pixel-button {
-  font-family: 'PixelFont', sans-serif;
-  image-rendering: pixelated;
-  box-shadow: 4px 4px 0 #000;
-}
-
-.pixel-button:active {
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0 #000;
+/* Prevent layout shift */
+html {
+    scrollbar-gutter: stable;
 }
 
