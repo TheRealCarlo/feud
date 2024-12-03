@@ -30,6 +30,11 @@ interface Square {
     faction: Faction | null;
 }
 
+interface Cooldown {
+    tokenId: string;
+    timestamp: number;
+}
+
 const getFactionColor = (faction: Faction): string => {
     switch (faction) {
         case 'IRON':
@@ -382,7 +387,7 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
 
                     // Check if the bear is in cooldown
                     const isInCooldown = currentGame.cooldowns?.some(
-                        cooldown => 
+                        (cooldown: Cooldown) => 
                             String(cooldown.tokenId) === String(square.bear.tokenId) &&
                             cooldown.timestamp > Date.now()
                     );
