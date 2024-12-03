@@ -27,6 +27,13 @@ const getFactionColor = (faction: Faction): string => {
     }
 };
 
+const getProvider = async (): Promise<BrowserProvider> => {
+    if (!window.ethereum) {
+        throw new Error('MetaMask is not installed');
+    }
+    return new BrowserProvider(window.ethereum);
+};
+
 export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardProps) {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [timeLeft, setTimeLeft] = useState<string>('');
@@ -183,9 +190,10 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                 const defenderId = targetSquare.bear.tokenId;
                 const attackerId = bear.tokenId;
 
-                // Initiate battle
+                // Get provider and initiate battle
+                const provider = await getProvider();
                 const attackerWins = await battleService.initiateBattle(
-                    window.ethereum,
+                    provider,
                     attackerId,
                     defenderId
                 );
@@ -257,7 +265,7 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                 await refreshGameState();
             } catch (err) {
                 console.error('Battle error:', err);
-                setBattleResult('Battle failed to complete');
+                setBattleResult(err instanceof Error ? err.message : 'Battle failed to complete');
             }
         } else {
             // Normal bear placement for unoccupied squares
