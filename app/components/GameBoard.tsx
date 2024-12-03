@@ -388,7 +388,7 @@ export default function GameBoard({ userFaction, nfts, onGameStart }: GameBoardP
                     // Check if the bear is in cooldown
                     const isInCooldown = currentGame.cooldowns?.some(
                         (cooldown: Cooldown) => 
-                            String(cooldown.tokenId) === String(square.bear.tokenId) &&
+                            String(cooldown.tokenId) === String(square.bear?.tokenId) &&
                             cooldown.timestamp > Date.now()
                     );
 
