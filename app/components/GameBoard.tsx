@@ -41,28 +41,29 @@ export function GameBoard({ userFaction, nfts, onGameStart }: GameBoardProps) {
             onGameStart();
         }
         setGameState(currentGame);
+    }, []);
 
-        // Set up timer
+    useEffect(() => {
+        if (!gameState) return;
+
         const interval = setInterval(() => {
-            if (currentGame) {
-                const now = Date.now();
-                const remaining = currentGame.endTime - now;
-                
-                if (remaining <= 0) {
-                    const battleResult = gameService.endGame(currentGame);
-                    gameService.saveBattleResult(battleResult);
-                    setGameState(null);
-                    clearInterval(interval);
-                } else {
-                    const hours = Math.floor(remaining / (1000 * 60 * 60));
-                    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-                    setTimeLeft(`${hours}h ${minutes}m`);
-                }
+            const now = Date.now();
+            const remaining = gameState.endTime - now;
+            
+            if (remaining <= 0) {
+                const battleResult = gameService.endGame(gameState);
+                gameService.saveBattleResult(battleResult);
+                setGameState(null);
+                clearInterval(interval);
+            } else {
+                const hours = Math.floor(remaining / (1000 * 60 * 60));
+                const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+                setTimeLeft(`${hours}h ${minutes}m`);
             }
         }, 1000);
 
         return () => clearInterval(interval);
-    }, []);
+    }, [gameState]);
 
     const handleBattle = async (squareId: number) => {
         const ethereum = window.ethereum;

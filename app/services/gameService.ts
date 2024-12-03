@@ -90,5 +90,52 @@ export const gameService = {
         
         const now = Date.now();
         return Math.max(0, state.endTime - now);
+    },
+
+    endGame: (gameState: GameState): BattleResult => {
+        // Calculate scores for each faction
+        const scores = {
+            IRON: 0,
+            GEO: 0,
+            TECH: 0,
+            PAW: 0
+        };
+
+        // Count squares controlled by each faction
+        gameState.squares.forEach(square => {
+            if (square.faction) {
+                scores[square.faction]++;
+            }
+        });
+
+        // Determine winning faction
+        let winningFaction: Faction = 'IRON';
+        let maxScore = scores.IRON;
+
+        Object.entries(scores).forEach(([faction, score]) => {
+            if (score > maxScore) {
+                maxScore = score;
+                winningFaction = faction as Faction;
+            }
+        });
+
+        const battleResult: BattleResult = {
+            id: `game-${gameState.startTime}`,
+            startTime: gameState.startTime,
+            endTime: gameState.endTime,
+            winningFaction,
+            scores
+        };
+
+        // Clear the current game state
+        gameService.clearGameState();
+
+        return battleResult;
+    },
+
+    saveBattleResult: (result: BattleResult): void => {
+        const history = gameService.getBattleHistory();
+        history.push(result);
+        localStorage.setItem(BATTLE_HISTORY_KEY, JSON.stringify(history));
     }
 }; 
