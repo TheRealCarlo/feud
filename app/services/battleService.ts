@@ -1,5 +1,6 @@
 import { BrowserProvider, Contract } from 'ethers';
 import { Faction, GameState } from '../types/game';
+import dynamic from 'next/dynamic';
 
 const BATTLE_CONTRACT_ADDRESS = '0x20aCfa11998c23896A61E467cB0F605C2d46C7B7';
 
@@ -17,6 +18,10 @@ const BATTLE_ABI = [
 ];
 
 const COOLDOWN_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+
+const BearSelector = dynamic(() => import('./components/BearSelector'), {
+    loading: () => <div>Loading...</div>
+});
 
 export const battleService = {
     async initiateBattle(
