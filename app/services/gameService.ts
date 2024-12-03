@@ -1,4 +1,4 @@
-import { GameState, Square } from '../types/game';
+import { GameState, Square, Battle } from '../types/game';
 
 const GAME_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
