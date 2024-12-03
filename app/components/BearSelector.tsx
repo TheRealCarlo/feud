@@ -14,17 +14,18 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: B
     const [allBears, setAllBears] = useState<any[]>([]);
 
     useEffect(() => {
-        // Combine available NFTs with those in cooldown
         const allBearsMap = new Map();
-        
-        // Add available NFTs
+
+        // Add all NFTs
         nfts.forEach(bear => allBearsMap.set(bear.tokenId, bear));
-        
-        // Add bears in cooldown
+
+        // Add bears from cooldowns
         if (gameState?.cooldowns && Array.isArray(gameState.cooldowns)) {
             gameState.cooldowns.forEach(cooldown => {
-                if (cooldown?.bear) {
-                    allBearsMap.set(cooldown.bear.tokenId, cooldown.bear);
+                // Find the bear in nfts array using the cooldown's tokenId
+                const cooldownBear = nfts.find(bear => bear.tokenId === cooldown.tokenId);
+                if (cooldownBear) {
+                    allBearsMap.set(cooldown.tokenId, cooldownBear);
                 }
             });
         }
