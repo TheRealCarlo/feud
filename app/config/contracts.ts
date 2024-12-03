@@ -1,3 +1,5 @@
+import { Contract } from 'ethers';
+
 // Network configurations
 export const NETWORKS = {
     ethereum: {
@@ -46,7 +48,7 @@ export const getBattleContract = async (provider: any) => {
         throw new Error('Please switch to Polygon network to interact with the Battle contract');
     }
 
-    return new ethers.Contract(
+    return new Contract(
         CONTRACTS.BATTLE.address,
         BATTLE_CONTRACT_ABI,
         provider
@@ -62,7 +64,7 @@ export const getBearsContract = async (provider: any) => {
         throw new Error('Please switch to Ethereum Mainnet to interact with the Bears contract');
     }
 
-    return new ethers.Contract(
+    return new Contract(
         CONTRACTS.BEARS.address,
         BEARS_CONTRACT_ABI,
         provider
