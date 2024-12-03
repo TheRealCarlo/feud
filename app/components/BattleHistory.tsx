@@ -1,83 +1,69 @@
 import { useState, useEffect } from 'react';
-import { Faction } from '../types/game';
+import { Faction, BattleResult } from '../types/game';
+import { gameService } from '../services/gameService';
 
-interface Battle {
-    id: string;
-    timestamp: number;
-    attacker: {
-        bearId: string;
-        faction: Faction;
-        owner: string;
-    };
-    defender: {
-        bearId: string;
-        faction: Faction;
-        owner: string;
-    };
-    winner: string;
-    position: { x: number; y: number };
-}
-
-interface BattleHistoryProps {
-    userAddress: string;
+export interface BattleHistoryProps {
     userFaction: Faction;
 }
 
-export function BattleHistory({ userAddress, userFaction }: BattleHistoryProps) {
-    const [battles, setBattles] = useState<Battle[]>([]);
-    const [loading, setLoading] = useState(true);
+export function BattleHistory({ userFaction }: BattleHistoryProps) {
+    const [battles, setBattles] = useState<BattleResult[]>([]);
 
     useEffect(() => {
-        // TODO: Fetch battle history from blockchain/backend
-        // Mock data for now
-        const mockBattles: Battle[] = [];
-        setLoading(false);
-        setBattles(mockBattles);
-    }, [userAddress]);
-
-    if (loading) {
-        return (
-            <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-            </div>
-        );
-    }
+        const history = gameService.getBattleHistory();
+        setBattles(history);
+    }, []);
 
     return (
-        <div className="space-y-4">
-            <h2 className="text-2xl font-bold mb-6">Recent Battles</h2>
-            {battles.length === 0 ? (
-                <div className="text-center text-gray-500 py-8">
-                    No battles found
-                </div>
-            ) : (
-                battles.map((battle) => (
-                    <div
+        <div className="container mx-auto p-4">
+            <h2 className="text-2xl font-bold text-white mb-6">Battle History</h2>
+            
+            <div className="space-y-4">
+                {battles.map((battle) => (
+                    <div 
                         key={battle.id}
-                        className="border rounded-lg p-4 hover:shadow-md transition-shadow duration-200"
+                        className={`
+                            bg-gray-800 rounded-lg p-4 border border-gray-700
+                            ${battle.winningFaction === userFaction ? 'border-green-500' : 'border-red-500'}
+                        `}
                     >
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-4">
-                                <div className="text-sm">
-                                    {new Date(battle.timestamp).toLocaleDateString()}
-                                </div>
-                                <div className="font-medium">
-                                    {battle.attacker.faction} vs {battle.defender.faction}
-                                </div>
-                            </div>
-                            <div className={`
-                                px-3 py-1 rounded-full text-sm
-                                ${battle.winner === userAddress ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-gray-400">
+                                {new Date(battle.startTime).toLocaleDateString()}
+                            </span>
+                            <span className={`
+                                px-3 py-1 rounded-full text-sm font-medium
+                                ${battle.winningFaction === userFaction ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}
                             `}>
-                                {battle.winner === userAddress ? 'Victory' : 'Defeat'}
-                            </div>
+                                {battle.winningFaction === userFaction ? 'Victory' : 'Defeat'}
+                            </span>
                         </div>
-                        <div className="mt-2 text-sm text-gray-600">
-                            Position: ({battle.position.x}, {battle.position.y})
+                        
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                            {Object.entries(battle.scores).map(([faction, score]) => (
+                                <div 
+                                    key={faction}
+                                    className={`
+                                        p-2 rounded-lg
+                                        ${faction === userFaction ? 'bg-gray-700' : 'bg-gray-900'}
+                                    `}
+                                >
+                                    <span className="text-sm text-gray-400">{faction}</span>
+                                    <span className="block text-lg font-bold text-white">{score}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                ))
-            )}
+                ))}
+
+                {battles.length === 0 && (
+                    <div className="text-center py-12">
+                        <p className="text-gray-400">
+                            No battles recorded yet.
+                        </p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 } 
