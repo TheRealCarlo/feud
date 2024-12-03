@@ -1,4 +1,4 @@
-import { ethers } from 'ethers';
+import { BrowserProvider } from 'ethers';
 import { Faction, GameState, BearState } from '../types/game';
 
 const BATTLE_CONTRACT_ADDRESS = '0x20aCfa11998c23896A61E467cB0F605C2d46C7B7';
@@ -20,7 +20,7 @@ const COOLDOWN_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
 export const battleService = {
     async initiateBattle(
-        provider: ethers.providers.Web3Provider,
+        provider: BrowserProvider,
         attackerId: string,
         defenderId: string
     ): Promise<boolean> {
@@ -38,7 +38,7 @@ export const battleService = {
             console.log('Current network:', network);
 
             // Create contract instance
-            const contract = new ethers.Contract(
+            const contract = new Contract(
                 BATTLE_CONTRACT_ADDRESS,
                 BATTLE_ABI,
                 provider
@@ -46,8 +46,8 @@ export const battleService = {
             console.log('Contract instance created');
 
             // Format token IDs
-            const attacker = ethers.BigNumber.from(attackerId);
-            const defender = ethers.BigNumber.from(defenderId);
+            const attacker = BigInt(attackerId);
+            const defender = BigInt(defenderId);
             console.log('Formatted IDs:', {
                 attacker: attacker.toString(),
                 defender: defender.toString()
@@ -55,9 +55,7 @@ export const battleService = {
 
             // Attempt contract call
             console.log('Attempting contract call...');
-            const result = await contract.calculateBattleOutcome(attacker, defender, {
-                gasLimit: 500000 // Add explicit gas limit
-            });
+            const result = await contract.calculateBattleOutcome(attacker, defender);
             console.log('Battle result received:', result);
             
             return result;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
+import { BrowserProvider } from 'ethers';
 import { BearSelector } from './BearSelector';
 import { Faction, GameState } from '../types/game';
 import { gameService } from '../services/gameService';
@@ -76,13 +76,12 @@ export function GameBoard({ userFaction, nfts, onGameStart }: GameBoardProps) {
 
         setIsBattling(true);
         try {
-            const provider = new ethers.providers.Web3Provider(ethereum);
+            const provider = new BrowserProvider(ethereum);
             
             // Find the selected bear for the attack
             setSelectedSquareId(squareId);
             setShowBearSelector(true);
 
-            // The battle will continue in handleBearSelect
         } catch (error) {
             console.error('Battle error:', error);
             alert('Failed to initiate battle. Please try again.');
@@ -118,7 +117,12 @@ export function GameBoard({ userFaction, nfts, onGameStart }: GameBoardProps) {
         if (targetSquare.faction && targetSquare.faction !== userFaction) {
             try {
                 setIsBattling(true);
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const ethereum = window.ethereum;
+                if (!ethereum) {
+                    alert('Please install MetaMask to participate in battles!');
+                    return;
+                }
+                const provider = new BrowserProvider(ethereum);
                 
                 const battleWon = await battleService.initiateBattle(
                     provider,

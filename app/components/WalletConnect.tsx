@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ethers } from 'ethers';
+import { BrowserProvider, Contract } from 'ethers';
 import { Faction, FACTION_COLORS } from '../types/game';
 
 const BRAWLER_BEARZ_ADDRESS = "0x556697Ca91476B811f37A851dD2e53ae4c6024dB";
@@ -85,11 +85,11 @@ export function WalletConnect({ onFactionDetermined, onNftsLoaded }: {
     const [connectingWallet, setConnectingWallet] = useState(false);
     const [userFaction, setUserFaction] = useState<Faction | null>(null);
 
-    const checkFaction = async (provider: ethers.providers.Web3Provider, address: string) => {
+    const checkFaction = async (provider: BrowserProvider, address: string) => {
         try {
             console.log('Checking faction for address:', address);
 
-            const factionContract = new ethers.Contract(
+            const factionContract = new Contract(
                 FACTION_CONTRACT_ADDRESS,
                 FACTION_ABI,
                 provider
@@ -98,7 +98,7 @@ export function WalletConnect({ onFactionDetermined, onNftsLoaded }: {
             const factionId = await factionContract.getFaction(address);
             console.log('Faction ID:', factionId.toString());
 
-            const faction = getFactionName(factionId.toNumber());
+            const faction = getFactionName(Number(factionId));
             console.log('Determined faction:', faction);
 
             setUserFaction(faction);
@@ -112,12 +112,12 @@ export function WalletConnect({ onFactionDetermined, onNftsLoaded }: {
         }
     };
 
-    const fetchNFTs = async (provider: ethers.providers.Web3Provider, address: string) => {
+    const fetchNFTs = async (provider: BrowserProvider, address: string) => {
         try {
             setLoading(true);
             
             // Brawler Bearz Contract
-            const brawlerBearzContract = new ethers.Contract(
+            const brawlerBearzContract = new Contract(
                 BRAWLER_BEARZ_ADDRESS,
                 [
                     "function balanceOf(address owner) view returns (uint256)",
@@ -131,11 +131,11 @@ export function WalletConnect({ onFactionDetermined, onNftsLoaded }: {
             const balance = await brawlerBearzContract.balanceOf(address);
             console.log('Brawler Bearz balance:', balance.toString());
 
-            if (balance.toNumber() > 0) {
+            if (Number(balance) > 0) {
                 const nftPromises = [];
                 
                 // Fetch all owned NFTs
-                for (let i = 0; i < balance.toNumber(); i++) {
+                for (let i = 0; i < Number(balance); i++) {
                     nftPromises.push((async () => {
                         try {
                             const tokenId = await brawlerBearzContract.tokenOfOwnerByIndex(address, i);
@@ -185,12 +185,16 @@ export function WalletConnect({ onFactionDetermined, onNftsLoaded }: {
         setConnectingWallet(true);
         try {
             if (typeof window.ethereum !== 'undefined') {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const provider = new BrowserProvider(window.ethereum);
                 await provider.send("eth_requestAccounts", []);
-                const signer = provider.getSigner();
+                const signer = await provider.getSigner();
                 const address = await signer.getAddress();
                 
                 console.log('Connected wallet address:', address);
+                
+                // Check network before proceeding
+                const networkOk = await checkNetwork(provider);
+                if (!networkOk) return;
                 
                 // Check faction using getFaction function
                 const faction = await checkFaction(provider, address);
@@ -236,10 +240,10 @@ export function WalletConnect({ onFactionDetermined, onNftsLoaded }: {
         }
     };
 
-    // Add network check
-    const checkNetwork = async (provider: ethers.providers.Web3Provider) => {
+    // Update network check for ethers v6
+    const checkNetwork = async (provider: BrowserProvider) => {
         const network = await provider.getNetwork();
-        if (network.chainId !== 1) { // Ethereum Mainnet
+        if (network.chainId !== 1n) { // Ethereum Mainnet
             try {
                 await window.ethereum.request({
                     method: 'wallet_switchEthereumChain',
