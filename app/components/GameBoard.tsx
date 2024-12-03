@@ -6,11 +6,11 @@ import { gameService } from '../services/gameService';
 import { battleService } from '../services/battleService';
 import { supabase } from '../lib/supabase'
 
-declare global {
-    interface Window {
-        ethereum?: any;
-    }
-}
+// declare global {
+//     interface Window {
+//         ethereum?: any;
+//     }
+// }
 
 interface GameBoardProps {
     userFaction: Faction;
