@@ -232,7 +232,9 @@ export function WalletConnect({ onFactionDetermined, onNftsLoaded }: {
     // Update network check for ethers v6
     const checkNetwork = async (provider: BrowserProvider) => {
         const network = await provider.getNetwork();
-        if (network.chainId !== 1n) { // Ethereum Mainnet
+        const chainId = Number(network.chainId);
+        
+        if (chainId !== 1) { // Ethereum Mainnet
             try {
                 await window.ethereum.request({
                     method: 'wallet_switchEthereumChain',
