@@ -63,4 +63,19 @@ export interface BattleResult {
     scores: {
         [key in Faction]: number;
     };
-} 
+}
+
+export type Battle = {
+    timestamp: number;
+    attacker: {
+        tokenId: string;
+        name: string;
+        faction: Faction;
+    };
+    defender: {
+        tokenId: string;
+        name: string;
+        faction: Faction;
+    };
+    winner: 'attacker' | 'defender';
+}; 

@@ -1,4 +1,4 @@
-import { GameState, Square } from '../types/game';
+import { GameState, Square, Battle } from '../types/game';
 
 const GAME_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
@@ -45,5 +45,31 @@ export const gameService = {
         const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
         
         return `${hours}h ${minutes}m`;
+    },
+
+    getBattleHistory: (): Battle[] => {
+        try {
+            const storedHistory = localStorage.getItem('battleHistory');
+            if (storedHistory) {
+                return JSON.parse(storedHistory);
+            }
+        } catch (err) {
+            console.error('Error reading battle history:', err);
+        }
+        return [];
+    },
+
+    addBattleToHistory: (battle: Battle): void => {
+        try {
+            const history = gameService.getBattleHistory();
+            history.unshift(battle); // Add new battle to the beginning
+            
+            // Keep only the last 10 battles
+            const trimmedHistory = history.slice(0, 10);
+            
+            localStorage.setItem('battleHistory', JSON.stringify(trimmedHistory));
+        } catch (err) {
+            console.error('Error saving battle history:', err);
+        }
     }
 }; 
