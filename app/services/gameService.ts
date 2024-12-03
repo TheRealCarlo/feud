@@ -1,4 +1,4 @@
-import { GameState, Square, Battle } from '../types/game';
+import { GameState, Square } from '../types/game';
 
 const GAME_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
@@ -15,7 +15,7 @@ export const gameService = {
         return squares;
     },
 
-    createInitialGameState: () => {
+    createInitialGameState: (): Omit<GameState, 'id'> => {
         const now = Date.now();
         return {
             squares: Array(64).fill(null).map((_, index) => ({
@@ -27,7 +27,7 @@ export const gameService = {
             used_bears: [],
             is_active: true,
             cooldowns: []
-        } as GameState;
+        };
     },
 
     isGameActive: (gameState: GameState): boolean => {
@@ -62,11 +62,8 @@ export const gameService = {
     addBattleToHistory: (battle: Battle): void => {
         try {
             const history = gameService.getBattleHistory();
-            history.unshift(battle); // Add new battle to the beginning
-            
-            // Keep only the last 10 battles
+            history.unshift(battle);
             const trimmedHistory = history.slice(0, 10);
-            
             localStorage.setItem('battleHistory', JSON.stringify(trimmedHistory));
         } catch (err) {
             console.error('Error saving battle history:', err);
