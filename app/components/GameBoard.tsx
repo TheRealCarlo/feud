@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserProvider } from 'ethers';
 import { BearSelector } from './BearSelector';
-import { Faction, GameState, Battle } from '../types/game';
+import { Faction, GameState, Battle, Square } from '../types/game';
 import { gameService } from '../services/gameService';
 import { battleService } from '../services/battleService';
 import { supabase } from '../lib/supabase';
@@ -15,14 +15,6 @@ interface GameBoardProps {
 interface Cooldown {
     tokenId: string;
     end_time: number;
-}
-
-// Define the Square type based on your data structure
-interface Square {
-    id: string;
-    faction: Faction | null;
-    bear: any; // Replace 'any' with the actual type if available
-    // Add other properties as needed
 }
 
 const getFactionColor = (faction: Faction): string => {
@@ -183,7 +175,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
 
     useEffect(() => {
         if (gameState?.squares) {
-            calculateTerritoryStats(gameState.squares as Square[]);
+            calculateTerritoryStats(gameState.squares);
         }
     }, [gameState?.squares, calculateTerritoryStats]);
 
