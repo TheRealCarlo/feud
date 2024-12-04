@@ -92,7 +92,6 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
 
     const refreshGameState = useCallback(async () => {
         try {
-            // First check if there's an active game
             const { data: activeGames, error: activeGamesError } = await supabase
                 .from('games')
                 .select('*')
@@ -106,9 +105,8 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                 return;
             }
 
-            let currentGame = activeGames?.[0] as GameState | undefined;
+            let currentGame: GameState | null = activeGames?.[0] || null;
 
-            // If no active game, create one
             if (!currentGame) {
                 try {
                     currentGame = await gameService.createNewGame();
@@ -123,7 +121,6 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                 }
             }
 
-            // Check if game should be completed
             if (currentGame) {
                 await gameService.checkGameCompletion(currentGame);
                 setGameState(currentGame);
