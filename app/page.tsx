@@ -6,6 +6,7 @@ import { WalletConnect } from './components/WalletConnect'
 import { Navigation } from './components/Navigation'
 import { Faction } from './types/game'
 import { ErrorBoundary } from './components/ErrorBoundary';
+import BattleHistory from './components/BattleHistory';
 
 // Dynamically import heavy components
 const GameBoard = dynamic(() => import('./components/GameBoard'), {
@@ -14,11 +15,6 @@ const GameBoard = dynamic(() => import('./components/GameBoard'), {
 
 const BearInventory = dynamic(() => import('./components/BearInventory'), {
     loading: () => <div className="text-white text-center p-4">Loading inventory...</div>
-});
-
-const BattleHistory = dynamic(() => import('./components/BattleHistory'), {
-    loading: () => <div>Loading battle history...</div>,
-    ssr: false
 });
 
 const Leaderboard = dynamic(() => import('./components/Leaderboard'), {
@@ -64,9 +60,7 @@ export default function Home() {
         );
       case 'history':
         return (
-          <BattleHistory
-            userFaction={userFaction}
-          />
+          <BattleHistory userFaction={userFaction} />
         );
       case 'leaderboard':
         return (

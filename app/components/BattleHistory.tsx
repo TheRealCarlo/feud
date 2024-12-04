@@ -1,13 +1,14 @@
 import React from 'react';
 import { useEffect, useState } from 'react';
 import { gameService } from '../services/gameService';
-import { Battle } from '../types/game';
+import { Battle, Faction } from '../types/game';
 
 interface BattleHistoryProps {
-    // your props here
+    userFaction: Faction;
+    // Add other props if needed
 }
 
-const BattleHistory: React.FC<BattleHistoryProps> = (props) => {
+const BattleHistory: React.FC<BattleHistoryProps> = ({ userFaction }) => {
     const [battles, setBattles] = useState<Battle[]>([]);
     const [loading, setLoading] = useState(true);
 
