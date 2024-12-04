@@ -41,7 +41,7 @@ export interface GameState {
     id?: number;
     squares: Square[];
     is_active: boolean;
-    created_at?: string;
+    created_at: string;
     activePlayers?: number;
     totalBattles?: number;
     used_bears?: string[];
