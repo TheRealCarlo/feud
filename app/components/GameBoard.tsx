@@ -229,6 +229,12 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
     };
 
     const handleBearSelection = async (selectedBear: any) => {
+        if (!gameState) {
+            console.error('Game state is null');
+            toast.error('Game state not available');
+            return;
+        }
+
         try {
             setIsBattling(true);
             const targetSquare = gameState.squares[selectedSquareId];
