@@ -232,16 +232,33 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
     };
 
     const handleBearSelection = async (selectedBear: any) => {
-        console.log('handleBearSelection called with provider:', { 
+        console.log('handleBearSelection called with:', { 
             hasProvider: !!provider,
-            providerNetwork: provider ? await provider.getNetwork() : null,
+            providerNetwork: provider ? await provider.getNetwork().catch(() => null) : null,
             walletAddress,
             selectedBear 
         });
 
+        if (!provider || !walletAddress) {
+            toast.error('Please connect your wallet to initiate battles');
+            return;
+        }
+
+        if (!gameState) {
+            console.error('Game state is null');
+            toast.error('Game state not available');
+            return;
+        }
+
+        if (selectedSquareId === null) {
+            console.error('No square selected');
+            toast.error('Please select a square first');
+            return;
+        }
+
         try {
             setIsBattling(true);
-            const targetSquare = gameState?.squares[selectedSquareId];
+            const targetSquare = gameState.squares[selectedSquareId];
             
             if (!targetSquare) {
                 throw new Error('Invalid square selection');
