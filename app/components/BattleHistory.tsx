@@ -1,23 +1,44 @@
+import React from 'react';
 import { useEffect, useState } from 'react';
 import { gameService } from '../services/gameService';
-import { Battle, Faction } from '../types/game';
+import { Battle } from '../types/game';
 
 interface BattleHistoryProps {
-    userFaction: Faction;
+    // your props here
 }
 
-export default function BattleHistory({ userFaction }: BattleHistoryProps) {
+const BattleHistory: React.FC<BattleHistoryProps> = (props) => {
     const [battles, setBattles] = useState<Battle[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const history = gameService.getBattleHistory();
-        setBattles(history);
+        const fetchBattles = async () => {
+            try {
+                setLoading(true);
+                const history = await gameService.getGameHistory();
+                setBattles(history);
+            } catch (error) {
+                console.error('Error fetching battle history:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchBattles();
     }, []);
+
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center p-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            </div>
+        );
+    }
 
     if (battles.length === 0) {
         return (
-            <div className="p-4 text-gray-400 text-center">
-                No battles yet
+            <div className="text-center p-4 text-gray-500">
+                No battles recorded yet
             </div>
         );
     }
@@ -26,49 +47,45 @@ export default function BattleHistory({ userFaction }: BattleHistoryProps) {
         <div className="space-y-4">
             {battles.map((battle) => (
                 <div 
-                    key={battle.timestamp} 
-                    className="bg-gray-800 p-4 rounded-lg shadow"
+                    key={battle.id}
+                    className="bg-gray-800 rounded-lg p-4 shadow-md"
                 >
-                    <div className="flex justify-between text-sm text-gray-400">
-                        <span>
-                            {new Date(battle.timestamp).toLocaleTimeString()}
-                        </span>
-                        <span className={
-                            battle.attacker.faction === userFaction
-                                ? battle.winner === 'attacker'
-                                    ? 'text-green-500'
-                                    : 'text-red-500'
-                                : battle.winner === 'defender'
-                                    ? 'text-green-500'
-                                    : 'text-red-500'
-                        }>
-                            {battle.attacker.faction === userFaction
-                                ? battle.winner === 'attacker'
-                                    ? 'Victory'
-                                    : 'Defeat'
-                                : battle.winner === 'defender'
-                                    ? 'Victory'
-                                    : 'Defeat'
-                            }
-                        </span>
-                    </div>
-                    <div className="mt-2 flex justify-between items-center">
-                        <div className="flex-1">
-                            <div className="text-white">{battle.attacker.name}</div>
-                            <div className="text-sm text-gray-400">
-                                {battle.attacker.faction}
-                            </div>
+                    <div className="flex justify-between items-center mb-2">
+                        <div className="text-sm text-gray-400">
+                            {new Date(battle.completed_at).toLocaleDateString()}
                         </div>
-                        <div className="mx-4 text-gray-400">vs</div>
-                        <div className="flex-1 text-right">
-                            <div className="text-white">{battle.defender.name}</div>
-                            <div className="text-sm text-gray-400">
-                                {battle.defender.faction}
-                            </div>
+                        <div className={`px-2 py-1 rounded text-sm font-medium
+                            ${battle.winning_faction === 'IRON' ? 'bg-blue-500/20 text-blue-400' :
+                              battle.winning_faction === 'GEO' ? 'bg-orange-500/20 text-orange-400' :
+                              battle.winning_faction === 'TECH' ? 'bg-purple-500/20 text-purple-400' :
+                              'bg-green-500/20 text-green-400'}`}
+                        >
+                            {battle.winning_faction} Victory
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 mt-2">
+                        <div className="text-center">
+                            <div className="text-sm text-blue-400">IRON</div>
+                            <div className="font-medium">{battle.iron_squares}</div>
+                        </div>
+                        <div className="text-center">
+                            <div className="text-sm text-orange-400">GEO</div>
+                            <div className="font-medium">{battle.geo_squares}</div>
+                        </div>
+                        <div className="text-center">
+                            <div className="text-sm text-purple-400">TECH</div>
+                            <div className="font-medium">{battle.tech_squares}</div>
+                        </div>
+                        <div className="text-center">
+                            <div className="text-sm text-green-400">PAW</div>
+                            <div className="font-medium">{battle.paw_squares}</div>
                         </div>
                     </div>
                 </div>
             ))}
         </div>
     );
-} 
+};
+
+// Make sure to use a default export
+export default BattleHistory; 

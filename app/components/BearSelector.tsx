@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { GameState } from '../types/game';
 import { OptimizedImage } from './OptimizedImage';
 import { supabase } from '../lib/supabase';
+import { cleanExpiredCooldowns, getCooldownDetails } from '../utils/cooldownUtils';
 
 interface BearSelectorProps {
     nfts: any[];
     onSelect: (bear: any) => void;
     onClose: () => void;
-    gameState: GameState;
+    gameState: any;
     isBattle: boolean;
 }
 
@@ -18,111 +19,83 @@ interface Cooldown {
     created_at?: string;
 }
 
-export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: BearSelectorProps) {
+export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameState, isBattle }: BearSelectorProps) {
     const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
     const [loading, setLoading] = useState(true);
+    const [processedBears, setProcessedBears] = useState<any[]>([]);
 
-    useEffect(() => {
-        console.log('BearSelector Data:', {
-            nfts,
-            gameState,
-            cooldowns: gameState?.cooldowns,
-            used_bears: gameState?.used_bears
-        });
-
-        // Check if NFTs are loaded
-        if (!nfts || nfts.length === 0) {
-            setLoading(true);
-            return;
-        }
-
-        const allBearsMap = new Map();
-
-        // Process NFTs and statuses
-        nfts.forEach(bear => {
-            const tokenId = String(bear.tokenId);
-            allBearsMap.set(tokenId, {
-                ...bear,
-                tokenId,
-                status: 'ready'
-            });
-        });
-
-        // Process battle status
-        if (gameState?.used_bears) {
-            gameState.used_bears.forEach(tokenId => {
-                const normalizedTokenId = String(tokenId);
-                const bear = allBearsMap.get(normalizedTokenId);
-                if (bear) {
-                    allBearsMap.set(normalizedTokenId, {
-                        ...bear,
-                        status: 'in_battle'
-                    });
-                }
-            });
-        }
-
-        // Process cooldowns
-        if (gameState?.cooldowns && Array.isArray(gameState.cooldowns)) {
-            gameState.cooldowns.forEach(cooldown => {
-                const normalizedTokenId = String(cooldown.tokenId);
-                const bear = allBearsMap.get(normalizedTokenId);
-                if (bear) {
-                    allBearsMap.set(normalizedTokenId, {
-                        ...bear,
-                        status: 'cooldown',
-                        cooldownEnd: cooldown.timestamp
-                    });
-                }
-            });
-        }
-
-        setCooldowns(Array.from(allBearsMap.values()));
-        setLoading(false);
-    }, [nfts, gameState?.cooldowns, gameState?.used_bears]);
-
+    // Single fetch on mount for cooldowns
     useEffect(() => {
         const fetchCooldowns = async () => {
             try {
-                console.log('Fetching cooldowns...');
-                const { data, error } = await supabase
+                const { data: cooldownData, error: cooldownError } = await supabase
                     .from('cooldowns')
                     .select('*')
                     .gt('end_time', Math.floor(Date.now() / 1000));
 
-                if (error) {
-                    console.error('Error fetching cooldowns:', error);
-                    return;
+                if (cooldownError) {
+                    console.error('Error fetching cooldowns:', cooldownError);
+                } else {
+                    setCooldowns(cooldownData || []);
                 }
-
-                console.log('Fetched cooldowns:', data);
-                setCooldowns(data || []);
             } catch (err) {
-                console.error('Error in fetchCooldowns:', err);
-            } finally {
-                setLoading(false);
+                console.error('Error fetching cooldowns:', err);
             }
         };
 
         fetchCooldowns();
-        const intervalId = setInterval(fetchCooldowns, 30000); // Refresh every 30 seconds
-        return () => clearInterval(intervalId);
-    }, []);
+    }, []); // Only run once on mount
 
-    const isInCooldown = (tokenId: string) => {
+    // Process bears separately
+    useEffect(() => {
+        if (!nfts) return;
+
+        const processBears = () => {
+            const allBearsMap = new Map();
+
+            // Process NFTs and statuses
+            nfts.forEach(bear => {
+                const tokenId = String(bear.tokenId);
+                const cooldown = cooldowns.find(c => c.token_id === tokenId);
+                
+                allBearsMap.set(tokenId, {
+                    ...bear,
+                    tokenId,
+                    status: cooldown ? 'cooldown' : 'ready',
+                    cooldownEnd: cooldown?.end_time
+                });
+            });
+
+            // Process battle status
+            if (initialGameState?.used_bears) {
+                initialGameState.used_bears.forEach(tokenId => {
+                    const normalizedTokenId = String(tokenId);
+                    const bear = allBearsMap.get(normalizedTokenId);
+                    if (bear && bear.status !== 'cooldown') {
+                        allBearsMap.set(normalizedTokenId, {
+                            ...bear,
+                            status: 'in_battle'
+                        });
+                    }
+                });
+            }
+
+            setProcessedBears(Array.from(allBearsMap.values()));
+            setLoading(false);
+        };
+
+        processBears();
+    }, [nfts, initialGameState?.used_bears, cooldowns]);
+
+    const isInCooldown = useCallback((tokenId: string) => {
         const cooldown = cooldowns.find(c => c.token_id === String(tokenId));
         if (!cooldown) return false;
 
-        const isStillInCooldown = cooldown.end_time > Math.floor(Date.now() / 1000);
-        console.log(`Cooldown check for ${tokenId}:`, {
-            endTime: new Date(cooldown.end_time * 1000).toISOString(),
-            now: new Date().toISOString(),
-            isInCooldown: isStillInCooldown
-        });
-        return isStillInCooldown;
-    };
+        const currentTime = Math.floor(Date.now() / 1000);
+        return cooldown.end_time > currentTime;
+    }, [cooldowns]);
 
-    const getCooldownTimeRemaining = (tokenId: string) => {
+    const getCooldownTimeRemaining = useCallback((tokenId: string) => {
         const cooldown = cooldowns.find(c => c.token_id === String(tokenId));
         if (!cooldown) return null;
         
@@ -132,23 +105,14 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: B
         const hours = Math.floor(remainingTime / (1000 * 60 * 60));
         const minutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
         return `${hours}h ${minutes}m`;
-    };
+    }, [cooldowns]);
 
-    // Add a refresh interval to update cooldown timers
-    useEffect(() => {
-        const interval = setInterval(() => {
-            // Force a re-render to update cooldown times
-            setCooldowns(prevCooldowns => [...prevCooldowns]);
-        }, 1000); // Update every second
-
-        return () => clearInterval(interval);
-    }, []);
-
-    const filteredBears = nfts.filter((nft) => {
-        const inCooldown = isInCooldown(nft.tokenId);
-        const inBattle = gameState?.used_bears?.includes(nft.tokenId);
-        return !inBattle || inCooldown; // Show only bears not in battle or in cooldown
-    });
+    // Filter bears to only show Ready and Cooldown states
+    const availableBears = useMemo(() => {
+        return processedBears.filter(bear => 
+            bear.status === 'ready' || bear.status === 'cooldown'
+        );
+    }, [processedBears]);
 
     return (
         <div className="bg-gray-900/95 backdrop-blur-lg rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden border border-gray-700">
@@ -185,9 +149,14 @@ export function BearSelector({ nfts, onSelect, onClose, gameState, isBattle }: B
                     <div className="flex justify-center items-center py-12">
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-600 border-t-blue-500"></div>
                     </div>
+                ) : availableBears.length === 0 ? (
+                    <div className="text-center py-12">
+                        <p className="text-gray-400">No bears available at the moment.</p>
+                        <p className="text-gray-500 text-sm mt-2">All your bears are currently in battle.</p>
+                    </div>
                 ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {filteredBears.map((nft) => {
+                        {availableBears.map((nft) => {
                             const cooldownTime = getCooldownTimeRemaining(nft.tokenId);
                             const inCooldown = isInCooldown(nft.tokenId);
                             

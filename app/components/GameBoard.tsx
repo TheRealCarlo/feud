@@ -5,11 +5,14 @@ import { Faction, GameState, Battle, Square } from '../types/game';
 import { gameService } from '../services/gameService';
 import { battleService } from '../services/battleService';
 import { supabase } from '../lib/supabase';
+import { toast } from 'react-hot-toast';
+import { cleanExpiredCooldowns, getCooldownDetails } from '../utils/cooldownUtils';
 
 interface GameBoardProps {
     userFaction: Faction;
     nfts: any[];
     onGameStart: () => void;
+    walletAddress: string;
 }
 
 interface Cooldown {
@@ -32,11 +35,13 @@ const getFactionColor = (faction: Faction): string => {
     }
 };
 
-const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onGameStart }) => {
+const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onGameStart, walletAddress: initialWalletAddress }) => {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [selectedSquareId, setSelectedSquareId] = useState<number | null>(null);
     const [showBearSelector, setShowBearSelector] = useState(false);
     const [isBattling, setIsBattling] = useState(false);
+    const [provider, setProvider] = useState<BrowserProvider | null>(null);
+    const [walletAddress, setWalletAddress] = useState<string>(initialWalletAddress || '');
     const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
     const [territoryStats, setTerritoryStats] = useState<{
         userPercentage: number;
@@ -53,80 +58,104 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
         }
     });
 
+    // Initialize provider and get wallet address
+    useEffect(() => {
+        const initProvider = async () => {
+            if (typeof window !== 'undefined' && window.ethereum) {
+                try {
+                    const ethersProvider = new BrowserProvider(window.ethereum);
+                    const accounts = await window.ethereum.request({ 
+                        method: 'eth_requestAccounts' 
+                    });
+                    
+                    console.log('Wallet initialized:', {
+                        provider: !!ethersProvider,
+                        account: accounts[0]
+                    });
+
+                    setProvider(ethersProvider);
+                    setWalletAddress(accounts[0]);
+                } catch (error) {
+                    console.error('Error initializing provider:', error);
+                    toast.error('Failed to connect to wallet');
+                }
+            } else {
+                console.error('No ethereum provider found');
+                toast.error('Please install MetaMask');
+            }
+        };
+
+        if (!walletAddress) {
+            initProvider();
+        }
+    }, [walletAddress]);
+
     const refreshGameState = useCallback(async () => {
-        console.log('Refreshing game state...');
         try {
-            const { data: currentGame, error: gameError } = await supabase
+            // First check if there's an active game
+            const { data: activeGames, error: activeGamesError } = await supabase
                 .from('games')
                 .select('*')
                 .eq('is_active', true)
                 .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
+                .limit(1);
 
-            if (gameError) {
-                console.error('Error refreshing game state:', {
-                    message: gameError.message,
-                    details: gameError.details,
-                    hint: gameError.hint,
-                    code: gameError.code
-                });
+            if (activeGamesError) {
+                console.error('Error fetching active games:', activeGamesError);
+                toast.error('Failed to refresh game state');
                 return;
             }
 
-            console.log('Current game data:', currentGame);
+            let currentGame = activeGames?.[0] as GameState | undefined;
 
-            if (currentGame && 'squares' in currentGame) {
-                const cooldowns = currentGame.cooldowns || [];
-                setCooldowns(cooldowns);
-
-                const updatedSquares = currentGame.squares.map((square: Square) => {
-                    if (!square.bear) return square;
-
-                    const isInCooldown = cooldowns?.some(
-                        (cooldown: Cooldown) => 
-                            cooldown.tokenId === String(square.bear?.tokenId) &&
-                            cooldown.end_time > Date.now()
-                    );
-
-                    if (isInCooldown) {
-                        return {
-                            ...square,
-                            bear: null,
-                            faction: null
-                        };
+            // If no active game, create one
+            if (!currentGame) {
+                try {
+                    currentGame = await gameService.createNewGame();
+                    if (!currentGame) {
+                        toast.error('Failed to create new game');
+                        return;
                     }
-
-                    return square;
-                });
-
-                const updatedGame = {
-                    ...currentGame,
-                    squares: updatedSquares
-                };
-
-                console.log('Updated game state:', updatedGame);
-                setGameState(updatedGame as GameState);
-            } else {
-                console.log('No active game found or invalid game data structure');
+                } catch (error) {
+                    console.error('Error creating new game:', error);
+                    toast.error('Failed to create new game');
+                    return;
+                }
             }
+
+            // Check if game should be completed
+            if (currentGame) {
+                await gameService.checkGameCompletion(currentGame);
+                setGameState(currentGame);
+            }
+
         } catch (err) {
-            console.error('Error during refresh:', {
-                error: err,
-                message: err instanceof Error ? err.message : 'Unknown error',
-                stack: err instanceof Error ? err.stack : undefined
-            });
+            console.error('Error during game refresh:', err);
+            toast.error('Failed to refresh game state');
         }
     }, []);
 
+    // Initial game state fetch
     useEffect(() => {
-        refreshGameState();
+        let mounted = true;
 
-        // Set up periodic refresh every 5 minutes
-        const intervalId = setInterval(refreshGameState, 5 * 60 * 1000);
+        const fetchInitialState = async () => {
+            if (mounted) {
+                await refreshGameState();
+            }
+        };
 
-        // Clean up interval on component unmount
-        return () => clearInterval(intervalId);
+        fetchInitialState();
+
+        return () => {
+            mounted = false;
+        };
+    }, [refreshGameState]);
+
+    // Periodic refresh (every 30 seconds)
+    useEffect(() => {
+        const interval = setInterval(refreshGameState, 30000);
+        return () => clearInterval(interval);
     }, [refreshGameState]);
 
     const calculateTerritoryStats = useCallback((squares: Square[]) => {
@@ -180,9 +209,161 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
     }, [gameState?.squares, calculateTerritoryStats]);
 
     const handleSquareClick = (index: number) => {
-        if (isBattling) return;
-        setSelectedSquareId(index);
-        setShowBearSelector(true);
+        console.log('Square clicked:', {
+            index,
+            squareData: gameState?.squares[index],
+            userFaction
+        });
+        
+        const targetSquare = gameState?.squares[index];
+        
+        // Check if it's a valid attack
+        if (targetSquare?.faction && targetSquare.faction !== userFaction) {
+            // Attacking an enemy square
+            setSelectedSquareId(index);
+            setShowBearSelector(true);
+        } else if (!targetSquare?.faction) {
+            // Deploying to empty square
+            setSelectedSquareId(index);
+            setShowBearSelector(true);
+        } else {
+            toast.error("You can't attack your own faction!");
+        }
+    };
+
+    const handleBearSelection = async (selectedBear: any) => {
+        try {
+            setIsBattling(true);
+            const targetSquare = gameState.squares[selectedSquareId];
+
+            if (!targetSquare.faction) {
+                // Deploying to an empty square
+                const updatedSquares = gameState.squares.map((square, index) => 
+                    index === selectedSquareId ? {
+                        ...square,
+                        bear: selectedBear,
+                        faction: userFaction
+                    } : square
+                );
+
+                // Update local state
+                setGameState(prev => ({
+                    ...prev!,
+                    squares: updatedSquares
+                }));
+
+                // Update backend
+                const { error: updateError } = await supabase
+                    .from('games')
+                    .update({ squares: updatedSquares })
+                    .eq('id', gameState.id);
+
+                if (updateError) {
+                    throw new Error(`Failed to update game: ${updateError.message}`);
+                }
+
+                // Update cooldowns
+                await gameService.updateCooldowns(selectedBear.tokenId, walletAddress);
+
+                // Show success toast
+                toast.success('Bear deployed successfully!');
+            } else if (targetSquare.faction !== userFaction) {
+                // Attacking an enemy square
+                const attacker = {
+                    ...selectedBear,
+                    metadata: {
+                        ...selectedBear.metadata,
+                        faction: userFaction
+                    }
+                };
+
+                const defender = {
+                    ...targetSquare.bear,
+                    metadata: {
+                        ...targetSquare.bear.metadata,
+                        faction: targetSquare.faction
+                    }
+                };
+
+                const battleToast = toast.loading(
+                    <div className="flex flex-col space-y-2">
+                        <div className="font-bold text-yellow-400">Battle Initiated!</div>
+                        <div className="text-sm">
+                            {attacker.metadata.name} vs {defender.metadata.name}
+                        </div>
+                    </div>
+                );
+
+                const attackerWins = await battleService.initiateBattle(
+                    provider,
+                    attacker.tokenId,
+                    defender.tokenId
+                );
+
+                await battleService.recordBattle(
+                    attacker,
+                    defender,
+                    attackerWins ? attacker.tokenId : defender.tokenId
+                );
+
+                toast.dismiss(battleToast);
+
+                const updatedSquares = gameState.squares.map((square, index) => 
+                    index === selectedSquareId ? {
+                        ...square,
+                        bear: attackerWins ? attacker : defender,
+                        faction: attackerWins ? userFaction : targetSquare.faction
+                    } : square
+                );
+
+                setGameState(prev => ({
+                    ...prev!,
+                    squares: updatedSquares
+                }));
+
+                const { error: battleUpdateError } = await supabase
+                    .from('games')
+                    .update({ squares: updatedSquares })
+                    .eq('id', gameState.id);
+
+                if (battleUpdateError) {
+                    throw new Error(`Failed to update game after battle: ${battleUpdateError.message}`);
+                }
+
+                if (attackerWins) {
+                    await gameService.updateCooldowns(defender.tokenId, walletAddress);
+                    toast.success(
+                        <div className="flex flex-col space-y-2">
+                            <div className="font-bold text-green-400">Victory!</div>
+                            <div className="text-sm">
+                                {attacker.metadata.name} has defeated {defender.metadata.name}!
+                            </div>
+                        </div>,
+                        { duration: 5000 }
+                    );
+                } else {
+                    await gameService.updateCooldowns(attacker.tokenId, walletAddress);
+                    toast.error(
+                        <div className="flex flex-col space-y-2">
+                            <div className="font-bold text-red-400">Defeat!</div>
+                            <div className="text-sm">
+                                {attacker.metadata.name} was beaten by {defender.metadata.name}!
+                            </div>
+                        </div>,
+                        { duration: 5000 }
+                    );
+                }
+            } else {
+                toast.error("You can't attack your own faction!");
+            }
+        } catch (error) {
+            console.error('Error during bear selection:', error);
+            toast.error('Failed to deploy bear! Please try again.');
+        } finally {
+            setIsBattling(false);
+            setShowBearSelector(false);
+            setSelectedSquareId(null);
+        }
     };
 
     return (
@@ -297,12 +478,10 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75">
                         <BearSelector
                             nfts={nfts}
-                            onSelect={(bear) => {
-                                // Your bear selection logic
-                                setSelectedSquareId(null);
-                            }}
+                            onSelect={handleBearSelection}
                             onClose={() => {
                                 setSelectedSquareId(null);
+                                setShowBearSelector(false);
                             }}
                             gameState={gameState}
                             isBattle={!!gameState.squares[selectedSquareId]?.faction}

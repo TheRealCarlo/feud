@@ -17,7 +17,8 @@ const BearInventory = dynamic(() => import('./components/BearInventory'), {
 });
 
 const BattleHistory = dynamic(() => import('./components/BattleHistory'), {
-    loading: () => <div className="text-white text-center p-4">Loading battle history...</div>
+    loading: () => <div>Loading battle history...</div>,
+    ssr: false
 });
 
 const Leaderboard = dynamic(() => import('./components/Leaderboard'), {
@@ -30,6 +31,7 @@ export default function Home() {
   const [userFaction, setUserFaction] = useState<Faction | null>(null)
   const [nfts, setNfts] = useState<any[]>([]);
   const [activeView, setActiveView] = useState<View>('game');
+  const [walletAddress, setWalletAddress] = useState<string>('');
 
   const handleFactionDetermined = (faction: Faction) => {
     setUserFaction(faction);
@@ -50,6 +52,7 @@ export default function Home() {
             userFaction={userFaction}
             nfts={nfts}
             onGameStart={handleGameStart}
+            walletAddress={walletAddress}
           />
         );
       case 'inventory':
@@ -97,6 +100,7 @@ export default function Home() {
               <WalletConnect 
                 onFactionDetermined={handleFactionDetermined}
                 onNftsLoaded={setNfts}
+                onWalletConnected={setWalletAddress}
               />
 
               {userFaction && (

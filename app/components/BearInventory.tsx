@@ -27,10 +27,138 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
     const [bearRecords, setBearRecords] = useState<BearRecord[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const isInCooldown = (tokenId: string) => {
+        const cooldown = cooldowns.find(c => c.token_id === String(tokenId));
+        if (!cooldown) return false;
+
+        const currentTime = Math.floor(Date.now() / 1000);
+        const isStillInCooldown = cooldown.end_time > currentTime;
+        
+        console.log('Cooldown check:', {
+            tokenId,
+            currentTime,
+            endTime: cooldown.end_time,
+            isStillInCooldown
+        });
+        
+        return isStillInCooldown;
+    };
+
+    const cleanExpiredCooldowns = async () => {
+        try {
+            // First get expired cooldowns
+            const currentTime = Math.floor(Date.now() / 1000);
+            const { data: expiredCooldowns, error: fetchError } = await supabase
+                .from('cooldowns')
+                .select('*')
+                .lt('end_time', currentTime);
+
+            if (fetchError) {
+                console.error('Error fetching expired cooldowns:', fetchError);
+                return;
+            }
+
+            if (!expiredCooldowns?.length) {
+                console.log('No expired cooldowns to clean');
+                return;
+            }
+
+            // Then delete them using their IDs
+            const expiredIds = expiredCooldowns.map(c => c.id);
+            const { error: deleteError } = await supabase
+                .from('cooldowns')
+                .delete()
+                .in('id', expiredIds);
+
+            if (deleteError) {
+                console.error('Error deleting expired cooldowns:', deleteError);
+            } else {
+                console.log(`Cleaned ${expiredIds.length} expired cooldowns`);
+            }
+        } catch (err) {
+            console.error('Error in cleanExpiredCooldowns:', err);
+        }
+    };
+
+    const isOnGameBoard = (tokenId: string) => {
+        if (!gameState?.squares) return false;
+        
+        // Check if the bear is actively placed on any square
+        return gameState.squares.some(square => 
+            square?.bear?.tokenId === String(tokenId)
+        );
+    };
+
+    const isInBattle = (tokenId: string) => {
+        const inUsedBears = gameState?.used_bears?.includes(String(tokenId));
+        const bearInCooldown = isInCooldown(tokenId);
+        const activeOnBoard = isOnGameBoard(tokenId);
+        
+        console.log('Battle state check:', {
+            tokenId,
+            inUsedBears,
+            bearInCooldown,
+            activeOnBoard,
+            used_bears: gameState?.used_bears,
+            shouldBeInBattle: activeOnBoard && !bearInCooldown
+        });
+        
+        // Consider a bear in battle if it's on the board and not in cooldown
+        return activeOnBoard && !bearInCooldown;
+    };
+
+    const cleanUsedBears = async () => {
+        try {
+            if (!gameState?.id) return;
+            
+            // Get current cooldowns and active board positions
+            const currentTime = Math.floor(Date.now() / 1000);
+            const { data: activeCooldowns } = await supabase
+                .from('cooldowns')
+                .select('token_id')
+                .gt('end_time', currentTime);
+
+            const cooldownTokenIds = new Set(activeCooldowns?.map(c => c.token_id) || []);
+            const activeTokenIds = new Set(
+                gameState.squares
+                    .filter(square => square?.bear)
+                    .map(square => String(square.bear.tokenId))
+            );
+            
+            // Filter out bears that are neither in cooldown nor on the board
+            const updatedUsedBears = gameState.used_bears.filter(tokenId => 
+                cooldownTokenIds.has(String(tokenId)) || activeTokenIds.has(String(tokenId))
+            );
+
+            console.log('Cleaning used bears:', {
+                before: gameState.used_bears.length,
+                after: updatedUsedBears.length,
+                removed: gameState.used_bears.filter(id => !updatedUsedBears.includes(id)),
+                activeBears: Array.from(activeTokenIds),
+                cooldownBears: Array.from(cooldownTokenIds)
+            });
+
+            // Update game state
+            const { error } = await supabase
+                .from('games')
+                .update({ used_bears: updatedUsedBears })
+                .eq('id', gameState.id);
+
+            if (error) {
+                console.error('Error updating used bears:', error);
+            }
+        } catch (err) {
+            console.error('Error in cleanUsedBears:', err);
+        }
+    };
+
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch cooldowns
+                // Clean expired cooldowns first
+                await cleanExpiredCooldowns();
+                
+                // Then fetch current cooldowns
                 const { data: cooldownData, error: cooldownError } = await supabase
                     .from('cooldowns')
                     .select('*')
@@ -42,6 +170,9 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
                     console.log('Fetched cooldowns:', cooldownData);
                     setCooldowns(cooldownData || []);
                 }
+
+                // Clean used bears list
+                await cleanUsedBears();
 
                 // Fetch current game state
                 const { data: gameData, error: gameError } = await supabase
@@ -76,21 +207,9 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
         };
 
         fetchData();
-        const intervalId = setInterval(fetchData, 30000);
+        const intervalId = setInterval(fetchData, 10000);
         return () => clearInterval(intervalId);
     }, []);
-
-    const isInCooldown = (tokenId: string) => {
-        const cooldown = cooldowns.find(c => c.token_id === String(tokenId));
-        if (!cooldown) return false;
-
-        const isStillInCooldown = cooldown.end_time > Math.floor(Date.now() / 1000);
-        return isStillInCooldown;
-    };
-
-    const isInBattle = (tokenId: string) => {
-        return gameState?.used_bears?.includes(String(tokenId));
-    };
 
     const getCooldownTimeRemaining = (tokenId: string) => {
         const cooldown = cooldowns.find(c => c.token_id === String(tokenId));
@@ -105,7 +224,18 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
     };
 
     const getBearState = (tokenId: string) => {
-        if (isInCooldown(tokenId)) {
+        const cooldownActive = isInCooldown(tokenId);
+        const battleActive = isInBattle(tokenId);
+        const onBoard = isOnGameBoard(tokenId);
+        
+        console.log('Bear state check:', {
+            tokenId,
+            cooldownActive,
+            battleActive,
+            onBoard
+        });
+
+        if (cooldownActive) {
             const cooldownTime = getCooldownTimeRemaining(tokenId);
             return {
                 status: 'cooldown',
@@ -113,7 +243,7 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
                 color: 'text-yellow-400'
             };
         }
-        if (isInBattle(tokenId)) {
+        if (battleActive) {
             return {
                 status: 'battle',
                 text: 'In Battle',

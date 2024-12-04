@@ -20,7 +20,6 @@ export default function Leaderboard() {
     useEffect(() => {
         const fetchLeaderboard = async () => {
             try {
-                // Fetch the leaderboard data from the leaderboard view/table
                 const { data, error } = await supabase
                     .from('leaderboard')
                     .select('*')
@@ -42,10 +41,8 @@ export default function Leaderboard() {
             }
         };
 
-        // Initial fetch
         fetchLeaderboard();
 
-        // Set up real-time subscription for leaderboard updates
         const leaderboardSubscription = supabase
             .channel('leaderboard_changes')
             .on(
@@ -56,13 +53,11 @@ export default function Leaderboard() {
                     table: 'leaderboard'
                 },
                 () => {
-                    // Refresh the leaderboard when changes occur
                     fetchLeaderboard();
                 }
             )
             .subscribe();
 
-        // Cleanup subscription
         return () => {
             leaderboardSubscription.unsubscribe();
         };
@@ -86,12 +81,10 @@ export default function Leaderboard() {
                         key={bear.tokenId}
                         className="bg-gray-800 rounded-lg p-4 flex items-center gap-4"
                     >
-                        {/* Rank */}
                         <div className="text-2xl font-bold text-gray-400 w-8">
                             #{index + 1}
                         </div>
 
-                        {/* Bear Image */}
                         {bear.image && (
                             <div className="w-16 h-16 relative rounded-lg overflow-hidden">
                                 <OptimizedImage
@@ -103,7 +96,6 @@ export default function Leaderboard() {
                             </div>
                         )}
 
-                        {/* Bear Info */}
                         <div className="flex-grow">
                             <h3 className="text-lg font-semibold text-white">
                                 {bear.name}
@@ -113,7 +105,6 @@ export default function Leaderboard() {
                             </p>
                         </div>
 
-                        {/* Stats */}
                         <div className="text-right">
                             <div className="flex items-center gap-2 justify-end mb-1">
                                 <span className="text-green-500 font-medium">{bear.wins}W</span>
@@ -125,7 +116,6 @@ export default function Leaderboard() {
                             </div>
                         </div>
 
-                        {/* Faction Badge */}
                         <div className={`px-3 py-1 rounded-full text-sm ${
                             bear.faction === 'IRON' ? 'bg-blue-500 text-white' :
                             bear.faction === 'GEO' ? 'bg-orange-500 text-white' :
