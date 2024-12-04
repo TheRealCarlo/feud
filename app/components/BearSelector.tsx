@@ -53,8 +53,17 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
         const processBears = () => {
             const allBearsMap = new Map();
 
-            // Process NFTs and statuses
-            nfts.forEach(bear => {
+            // Filter out both used bears and bears in battle
+            const availableNfts = nfts.filter(bear => {
+                const tokenId = String(bear.tokenId);
+                const isUsed = initialGameState?.used_bears?.includes(tokenId);
+                const isInBattle = initialGameState?.squares?.some(square => 
+                    square.bear?.tokenId === tokenId
+                );
+                return !isUsed && !isInBattle;
+            });
+
+            availableNfts.forEach(bear => {
                 const tokenId = String(bear.tokenId);
                 const cooldown = cooldowns.find(c => c.token_id === tokenId);
                 
@@ -66,26 +75,12 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
                 });
             });
 
-            // Process battle status
-            if (initialGameState?.used_bears) {
-                initialGameState.used_bears.forEach((tokenId: string) => {
-                    const normalizedTokenId = String(tokenId);
-                    const bear = allBearsMap.get(normalizedTokenId);
-                    if (bear && bear.status !== 'cooldown') {
-                        allBearsMap.set(normalizedTokenId, {
-                            ...bear,
-                            status: 'in_battle'
-                        });
-                    }
-                });
-            }
-
             setProcessedBears(Array.from(allBearsMap.values()));
             setLoading(false);
         };
 
         processBears();
-    }, [nfts, initialGameState?.used_bears, cooldowns]);
+    }, [nfts, initialGameState?.used_bears, initialGameState?.squares, cooldowns]);
 
     const isInCooldown = useCallback((tokenId: string) => {
         const cooldown = cooldowns.find(c => c.token_id === String(tokenId));

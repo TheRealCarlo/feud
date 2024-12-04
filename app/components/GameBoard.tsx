@@ -241,12 +241,6 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
             return;
         }
 
-        if (!provider) {
-            console.error('No provider available');
-            toast.error('Please connect your wallet');
-            return;
-        }
-
         try {
             setIsBattling(true);
             const targetSquare = gameState.squares[selectedSquareId];
@@ -261,27 +255,25 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                     } : square
                 );
 
-                // Update local state
-                setGameState(prev => ({
-                    ...prev!,
-                    squares: updatedSquares
-                }));
-
-                // Update backend
+                // Update used bears in the database
                 const { error: updateError } = await supabase
                     .from('games')
-                    .update({ squares: updatedSquares })
+                    .update({ 
+                        squares: updatedSquares,
+                        used_bears: [...(gameState.used_bears || []), selectedBear.tokenId]
+                    })
                     .eq('id', gameState.id);
 
                 if (updateError) {
-                    throw new Error(`Failed to update game: ${updateError.message}`);
+                    throw updateError;
                 }
 
-                // Update cooldowns
-                await gameService.updateCooldowns(selectedBear.tokenId, walletAddress);
-
-                // Show success toast
-                toast.success('Bear deployed successfully!');
+                // Update local game state
+                setGameState(prevState => ({
+                    ...prevState,
+                    squares: updatedSquares,
+                    used_bears: [...(prevState?.used_bears || []), selectedBear.tokenId]
+                }));
             } else if (targetSquare.faction !== userFaction) {
                 // Attacking an enemy square
                 if (!targetSquare.bear) {
