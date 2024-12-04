@@ -235,6 +235,12 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
             return;
         }
 
+        if (selectedSquareId === null) {
+            console.error('No square selected');
+            toast.error('Please select a square first');
+            return;
+        }
+
         try {
             setIsBattling(true);
             const targetSquare = gameState.squares[selectedSquareId];
