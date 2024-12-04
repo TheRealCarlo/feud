@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { OptimizedImage } from './OptimizedImage';
 import { supabase } from '../lib/supabase';
-import { Faction } from '../types/game';
+import { Faction, Square } from '../types/game';
 
 interface Cooldown {
     token_id: string;
@@ -80,11 +80,12 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
         }
     };
 
-    const isOnGameBoard = (tokenId: string) => {
-        if (!gameState?.squares) return false;
+    const isBearDeployed = (tokenId: string) => {
+        if (!gameState?.squares) {
+            return false;
+        }
         
-        // Check if the bear is actively placed on any square
-        return gameState.squares.some(square => 
+        return gameState.squares.some((square: Square) => 
             square?.bear?.tokenId === String(tokenId)
         );
     };
@@ -92,7 +93,7 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
     const isInBattle = (tokenId: string) => {
         const inUsedBears = gameState?.used_bears?.includes(String(tokenId));
         const bearInCooldown = isInCooldown(tokenId);
-        const activeOnBoard = isOnGameBoard(tokenId);
+        const activeOnBoard = isBearDeployed(tokenId);
         
         console.log('Battle state check:', {
             tokenId,
@@ -226,7 +227,7 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
     const getBearState = (tokenId: string) => {
         const cooldownActive = isInCooldown(tokenId);
         const battleActive = isInBattle(tokenId);
-        const onBoard = isOnGameBoard(tokenId);
+        const onBoard = isBearDeployed(tokenId);
         
         console.log('Bear state check:', {
             tokenId,
