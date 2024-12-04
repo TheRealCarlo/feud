@@ -44,7 +44,7 @@ export class GameService {
         return Math.floor(endDate.getTime() / 1000);
     }
 
-    async createNewGame(): Promise<GameState | null> {
+    async createNewGame(endTime?: number): Promise<GameState | null> {
         if (this.isCreatingGame) {
             console.log('Game creation already in progress');
             return null;
@@ -78,7 +78,7 @@ export class GameService {
                     faction: null
                 })),
                 created_at: creationDate.toISOString(),
-                end_time: this.calculateEndTime(creationDate),
+                end_time: endTime || this.calculateEndTime(creationDate),
                 used_bears: []
             };
 
@@ -124,7 +124,7 @@ export class GameService {
 
     async checkGameCompletion(gameState: GameState): Promise<void> {
         try {
-            const gameEndTime = new Date(gameState.created_at).getTime() + (24 * 60 * 60 * 1000);
+            const gameEndTime = gameState.end_time * 1000; // Convert to milliseconds
             const currentTime = new Date().getTime();
 
             if (currentTime >= gameEndTime) {

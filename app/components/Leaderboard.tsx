@@ -52,9 +52,7 @@ export default function Leaderboard() {
                     schema: 'public',
                     table: 'leaderboard'
                 },
-                () => {
-                    fetchLeaderboard();
-                }
+                fetchLeaderboard
             )
             .subscribe();
 
@@ -75,62 +73,62 @@ export default function Leaderboard() {
         <div className="container mx-auto p-4">
             <h2 className="text-2xl font-bold text-white mb-6">Top 10 Brawlers</h2>
             
-            <div className="space-y-4">
-                {topBears.map((bear, index) => (
-                    <div 
-                        key={bear.tokenId}
-                        className="bg-gray-800 rounded-lg p-4 flex items-center gap-4"
-                    >
-                        <div className="text-2xl font-bold text-gray-400 w-8">
-                            #{index + 1}
-                        </div>
-
-                        {bear.image && (
-                            <div className="w-16 h-16 relative rounded-lg overflow-hidden">
-                                <OptimizedImage
-                                    src={bear.image}
-                                    alt={bear.name}
-                                    height="64px"
-                                    className="rounded-lg"
-                                />
-                            </div>
-                        )}
-
-                        <div className="flex-grow">
-                            <h3 className="text-lg font-semibold text-white">
-                                {bear.name}
-                            </h3>
-                            <p className="text-sm text-gray-400">
-                                #{bear.tokenId}
-                            </p>
-                        </div>
-
-                        <div className="text-right">
-                            <div className="flex items-center gap-2 justify-end mb-1">
-                                <span className="text-green-500 font-medium">{bear.wins}W</span>
-                                <span className="text-gray-400">/</span>
-                                <span className="text-red-500 font-medium">{bear.losses}L</span>
-                            </div>
-                            <div className="text-sm text-gray-400">
-                                {bear.win_rate.toFixed(1)}% Win Rate
-                            </div>
-                        </div>
-
-                        <div className={`px-3 py-1 rounded-full text-sm ${
-                            bear.faction === 'IRON' ? 'bg-blue-500 text-white' :
-                            bear.faction === 'GEO' ? 'bg-orange-500 text-white' :
-                            bear.faction === 'TECH' ? 'bg-gray-500 text-white' :
-                            'bg-purple-500 text-white'
-                        }`}>
-                            {bear.faction}
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {topBears.length === 0 && (
+            {topBears.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                     No battles recorded yet.
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {topBears.map((bear, index) => (
+                        <div 
+                            key={`${bear.tokenId}-${index}`}
+                            className="bg-gray-800 rounded-lg p-4 flex items-center gap-4"
+                        >
+                            <div className="text-2xl font-bold text-gray-400 w-8">
+                                #{index + 1}
+                            </div>
+
+                            {bear.image && (
+                                <div className="w-16 h-16 relative rounded-lg overflow-hidden">
+                                    <OptimizedImage
+                                        src={bear.image}
+                                        alt={bear.name}
+                                        height="64px"
+                                        className="rounded-lg"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="flex-grow">
+                                <h3 className="text-lg font-semibold text-white">
+                                    {bear.name}
+                                </h3>
+                                <p className="text-sm text-gray-400">
+                                    #{bear.tokenId}
+                                </p>
+                            </div>
+
+                            <div className="text-right">
+                                <div className="flex items-center gap-2 justify-end mb-1">
+                                    <span className="text-green-500 font-medium">{bear.wins}W</span>
+                                    <span className="text-gray-400">/</span>
+                                    <span className="text-red-500 font-medium">{bear.losses}L</span>
+                                </div>
+                                <div className="text-sm text-gray-400">
+                                    {bear.win_rate.toFixed(1)}% Win Rate
+                                </div>
+                            </div>
+
+                            <div className={`px-3 py-1 rounded-full text-sm ${
+                                bear.faction === 'IRON' ? 'bg-blue-500 text-white' :
+                                bear.faction === 'GEO' ? 'bg-orange-500 text-white' :
+                                bear.faction === 'TECH' ? 'bg-gray-500 text-white' :
+                                'bg-purple-500 text-white'
+                            }`}>
+                                {bear.faction}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
         </div>

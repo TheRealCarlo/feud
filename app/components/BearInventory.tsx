@@ -27,6 +27,14 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
     const [bearRecords, setBearRecords] = useState<BearRecord[]>([]);
     const [loading, setLoading] = useState(true);
 
+    useEffect(() => {
+        console.log('BearInventory mounted with:', {
+            nftsCount: nfts?.length,
+            nftsData: nfts,
+            userFaction
+        });
+    }, [nfts, userFaction]);
+
     const isInCooldown = (tokenId: string) => {
         const cooldown = cooldowns.find(c => c.token_id === String(tokenId));
         if (!cooldown) return false;

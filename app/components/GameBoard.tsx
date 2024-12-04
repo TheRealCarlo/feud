@@ -13,6 +13,7 @@ interface GameBoardProps {
     nfts: any[];
     onGameStart: () => void;
     walletAddress: string;
+    provider: BrowserProvider | null;
 }
 
 interface Cooldown {
@@ -35,13 +36,11 @@ const getFactionColor = (faction: Faction): string => {
     }
 };
 
-const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onGameStart, walletAddress: initialWalletAddress }) => {
+const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onGameStart, walletAddress, provider }) => {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [selectedSquareId, setSelectedSquareId] = useState<number | null>(null);
     const [showBearSelector, setShowBearSelector] = useState(false);
     const [isBattling, setIsBattling] = useState(false);
-    const [provider, setProvider] = useState<BrowserProvider | null>(null);
-    const [walletAddress, setWalletAddress] = useState<string>(initialWalletAddress || '');
     const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
     const [territoryStats, setTerritoryStats] = useState<{
         userPercentage: number;
@@ -57,38 +56,32 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
             TECH: 0
         }
     });
+    const [timeRemaining, setTimeRemaining] = useState<number>(24 * 60 * 60);
 
-    // Initialize provider and get wallet address
+    // Add wallet address listener
     useEffect(() => {
-        const initProvider = async () => {
-            if (typeof window !== 'undefined' && window.ethereum) {
-                try {
-                    const ethersProvider = new BrowserProvider(window.ethereum);
-                    const accounts = await window.ethereum.request({ 
-                        method: 'eth_requestAccounts' 
-                    });
-                    
-                    console.log('Wallet initialized:', {
-                        provider: !!ethersProvider,
-                        account: accounts[0]
-                    });
-
-                    setProvider(ethersProvider);
-                    setWalletAddress(accounts[0]);
-                } catch (error) {
-                    console.error('Error initializing provider:', error);
-                    toast.error('Failed to connect to wallet');
+        if (typeof window !== 'undefined' && window.ethereum) {
+            // Handle account changes
+            window.ethereum.on('accountsChanged', (accounts: string[]) => {
+                if (accounts.length === 0) {
+                    // Handle disconnect
+                    onWalletDisconnect?.();
                 }
-            } else {
-                console.error('No ethereum provider found');
-                toast.error('Please install MetaMask');
+            });
+
+            // Handle chain changes
+            window.ethereum.on('chainChanged', () => {
+                window.location.reload();
+            });
+        }
+
+        return () => {
+            if (window.ethereum) {
+                window.ethereum.removeListener('accountsChanged', () => {});
+                window.ethereum.removeListener('chainChanged', () => {});
             }
         };
-
-        if (!walletAddress) {
-            initProvider();
-        }
-    }, [walletAddress]);
+    }, []);
 
     const refreshGameState = useCallback(async () => {
         try {
@@ -109,7 +102,8 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
 
             if (!currentGame) {
                 try {
-                    currentGame = await gameService.createNewGame();
+                    const endTime = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+                    currentGame = await gameService.createNewGame(endTime);
                     if (!currentGame) {
                         toast.error('Failed to create new game');
                         return;
@@ -122,8 +116,10 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
             }
 
             if (currentGame) {
-                await gameService.checkGameCompletion(currentGame);
                 setGameState(currentGame);
+                const now = Math.floor(Date.now() / 1000);
+                const remainingTime = (currentGame.end_time || 0) - now;
+                setTimeRemaining(Math.max(0, remainingTime));
             }
 
         } catch (err) {
@@ -229,24 +225,24 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
     };
 
     const handleBearSelection = async (selectedBear: any) => {
-        if (!gameState) {
-            console.error('Game state is null');
-            toast.error('Game state not available');
-            return;
-        }
-
-        if (selectedSquareId === null) {
-            console.error('No square selected');
-            toast.error('Please select a square first');
-            return;
-        }
+        console.log('handleBearSelection called with provider:', { 
+            hasProvider: !!provider,
+            providerNetwork: provider ? await provider.getNetwork() : null,
+            walletAddress,
+            selectedBear 
+        });
 
         try {
             setIsBattling(true);
-            const targetSquare = gameState.squares[selectedSquareId];
+            const targetSquare = gameState?.squares[selectedSquareId];
+            
+            if (!targetSquare) {
+                throw new Error('Invalid square selection');
+            }
 
             if (!targetSquare.faction) {
                 // Deploying to an empty square
+                console.log('Deploying bear to empty square');
                 const updatedSquares = gameState.squares.map((square, index) => 
                     index === selectedSquareId ? {
                         ...square,
@@ -268,30 +264,27 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                     throw updateError;
                 }
 
-                // Update local game state with proper typing
+                // Update local game state
                 setGameState(prevState => {
                     if (!prevState) return null;
                     return {
                         ...prevState,
                         squares: updatedSquares,
                         used_bears: [...(prevState.used_bears || []), selectedBear.tokenId]
-                    } as GameState;  // Ensure the return type matches GameState
+                    } as GameState;
                 });
+
+                toast.success('Bear deployed successfully!');
+                
+                // Close the selector and reset state
+                setShowBearSelector(false);
+                setSelectedSquareId(null);
+                
+                // Force refresh the game state
+                await refreshGameState();
             } else if (targetSquare.faction !== userFaction) {
-                // Check if provider exists
-                if (!provider) {
-                    console.error('No provider available');
-                    toast.error('Wallet connection required for battles');
-                    return;
-                }
-
-                // Attacking an enemy square
-                if (!targetSquare.bear) {
-                    console.error('Target square has no bear');
-                    toast.error('Invalid target square');
-                    return;
-                }
-
+                // Battle logic
+                console.log('Initiating battle');
                 const attacker = {
                     ...selectedBear,
                     metadata: {
@@ -317,67 +310,71 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                     </div>
                 );
 
-                const attackerWins = await battleService.initiateBattle(
-                    provider,
-                    attacker.tokenId,
-                    defender.tokenId
-                );
-
-                await battleService.recordBattle(
-                    attacker,
-                    defender,
-                    attackerWins ? attacker.tokenId : defender.tokenId
-                );
-
-                toast.dismiss(battleToast);
-
-                const updatedSquares = gameState.squares.map((square, index) => 
-                    index === selectedSquareId ? {
-                        ...square,
-                        bear: attackerWins ? attacker : defender,
-                        faction: attackerWins ? userFaction : targetSquare.faction
-                    } : square
-                );
-
-                setGameState(prev => ({
-                    ...prev!,
-                    squares: updatedSquares
-                }));
-
-                const { error: battleUpdateError } = await supabase
-                    .from('games')
-                    .update({ squares: updatedSquares })
-                    .eq('id', gameState.id);
-
-                if (battleUpdateError) {
-                    throw new Error(`Failed to update game after battle: ${battleUpdateError.message}`);
-                }
-
-                if (attackerWins) {
-                    await gameService.updateCooldowns(defender.tokenId, walletAddress);
-                    toast.success(
-                        <div className="flex flex-col space-y-2">
-                            <div className="font-bold text-green-400">Victory!</div>
-                            <div className="text-sm">
-                                {attacker.metadata.name} has defeated {defender.metadata.name}!
-                            </div>
-                        </div>,
-                        { duration: 5000 }
+                try {
+                    const attackerWins = await battleService.initiateBattle(
+                        provider,
+                        attacker.tokenId,
+                        defender.tokenId
                     );
-                } else {
-                    await gameService.updateCooldowns(attacker.tokenId, walletAddress);
-                    toast.error(
-                        <div className="flex flex-col space-y-2">
-                            <div className="font-bold text-red-400">Defeat!</div>
-                            <div className="text-sm">
-                                {attacker.metadata.name} was beaten by {defender.metadata.name}!
-                            </div>
-                        </div>,
-                        { duration: 5000 }
-                    );
+
+                    toast.dismiss(battleToast);
+                    
+                    if (attackerWins) {
+                        // Handle victory logic
+                        toast.success('Victory! Square captured!');
+                        
+                        // Update square if attacker wins
+                        const updatedSquares = gameState.squares.map((square, index) => 
+                            index === selectedSquareId ? {
+                                ...square,
+                                bear: attacker,
+                                faction: userFaction
+                            } : square
+                        );
+
+                        // Update game state in database
+                        const { error: updateError } = await supabase
+                            .from('games')
+                            .update({ 
+                                squares: updatedSquares,
+                                used_bears: [...(gameState.used_bears || []), attacker.tokenId]
+                            })
+                            .eq('id', gameState.id);
+
+                        if (updateError) throw updateError;
+
+                        // Update local state
+                        setGameState(prevState => ({
+                            ...prevState!,
+                            squares: updatedSquares,
+                            used_bears: [...(prevState?.used_bears || []), attacker.tokenId]
+                        }));
+
+                    } else {
+                        // Handle defeat logic
+                        toast.error('Defeat! Better luck next time!');
+                        
+                        // Add cooldown for the attacker
+                        const cooldownEnd = Math.floor(Date.now() / 1000) + (60 * 60); // 1 hour cooldown
+                        const { error: cooldownError } = await supabase
+                            .from('cooldowns')
+                            .insert({
+                                token_id: attacker.tokenId,
+                                end_time: cooldownEnd,
+                                wallet_address: walletAddress
+                            });
+
+                        if (cooldownError) {
+                            console.error('Error adding cooldown:', cooldownError);
+                        } else {
+                            console.log('Cooldown added for attacker:', attacker.tokenId);
+                        }
+                    }
+                } catch (battleError) {
+                    console.error('Battle error:', battleError);
+                    toast.dismiss(battleToast);
+                    toast.error('Battle failed! Please try again.');
                 }
-            } else {
-                toast.error("You can't attack your own faction!");
             }
         } catch (error) {
             console.error('Error during bear selection:', error);
@@ -389,9 +386,86 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
         }
     };
 
+    // Timer logic using server time
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setTimeRemaining(prevTime => {
+                if (prevTime <= 0) {
+                    clearInterval(timer);
+                    handleGameEnd();
+                    return 0;
+                }
+                return prevTime - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, []);
+
+    const handleGameEnd = async () => {
+        try {
+            const winningFaction = determineWinningFaction();
+
+            // Record the winner in battle history
+            await supabase.from('battlehistory').insert({
+                game_id: gameState?.id,
+                winning_faction: winningFaction,
+                completed_at: new Date().toISOString()
+            });
+
+            // Create new game with new end time
+            const endTime = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+            const newGame = await gameService.createNewGame(endTime);
+            
+            if (newGame) {
+                setGameState(newGame);
+                setTimeRemaining(24 * 60 * 60);
+            } else {
+                toast.error('Failed to start a new game');
+            }
+        } catch (error) {
+            console.error('Error handling game end:', error);
+            toast.error('Failed to end game properly');
+        }
+    };
+
+    const determineWinningFaction = (): Faction | null => {
+        if (!gameState) return null;
+
+        const factionCounts: Record<Faction, number> = {
+            IRON: 0,
+            GEO: 0,
+            PAW: 0,
+            TECH: 0
+        };
+
+        gameState.squares.forEach(square => {
+            if (square.faction) {
+                factionCounts[square.faction]++;
+            }
+        });
+
+        return Object.entries(factionCounts).reduce((maxFaction, [faction, count]) => {
+            return count > factionCounts[maxFaction] ? faction as Faction : maxFaction;
+        }, 'IRON' as Faction);
+    };
+
+    const formatTime = (seconds: number) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
     return (
         <div className="game-board max-w-4xl mx-auto relative">
             <div className="bg-gray-800/90 rounded-2xl shadow-2xl p-6 backdrop-blur-sm">
+                {/* Timer Display */}
+                <div className="mb-6 text-center">
+                    <h2 className="text-2xl font-bold text-white mb-2">Time Remaining</h2>
+                    <p className="text-xl font-bold text-yellow-400">{formatTime(timeRemaining)}</p>
+                </div>
+
                 {/* Territory Stats */}
                 <div className="mb-6 text-center">
                     <h2 className="text-2xl font-bold text-white mb-2">Capture Town Square</h2>
@@ -508,6 +582,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                             }}
                             gameState={gameState}
                             isBattle={!!gameState.squares[selectedSquareId]?.faction}
+                            walletAddress={walletAddress}
                         />
                     </div>
                 )}

@@ -67,11 +67,13 @@ const getFactionColor = (faction: Faction): string => {
 export function WalletConnect({ 
     onFactionDetermined, 
     onNftsLoaded,
-    onWalletConnected 
+    onWalletConnected,
+    onProviderSet 
 }: { 
     onFactionDetermined: (faction: Faction) => void;
     onNftsLoaded: (nfts: any[]) => void;
     onWalletConnected: (address: string) => void;
+    onProviderSet?: (provider: BrowserProvider) => void;
 }) {
     const [account, setAccount] = useState<string>('');
     const [nfts, setNfts] = useState<any[]>([]);
@@ -109,8 +111,9 @@ export function WalletConnect({
     const fetchNFTs = async (provider: BrowserProvider, address: string) => {
         try {
             setLoading(true);
-            
-            // Brawler Bearz Contract
+            console.log('Starting NFT fetch process for address:', address);
+
+            // Create contract instance
             const brawlerBearzContract = new Contract(
                 BRAWLER_BEARZ_ADDRESS,
                 [
@@ -121,52 +124,65 @@ export function WalletConnect({
                 provider
             );
 
-            // Get number of Brawler Bearz owned
+            // Get NFT balance
             const balance = await brawlerBearzContract.balanceOf(address);
-            console.log('Brawler Bearz balance:', balance.toString());
+            const balanceNumber = Number(balance);
+            console.log('NFT balance:', balanceNumber);
 
-            if (Number(balance) > 0) {
-                const nftPromises = [];
+            if (balanceNumber === 0) {
+                console.log('No NFTs found');
+                onNftsLoaded([]);
+                return;
+            }
+
+            // Fetch each NFT
+            const nftPromises = [];
+            for (let i = 0; i < balanceNumber; i++) {
+                const tokenId = await brawlerBearzContract.tokenOfOwnerByIndex(address, i);
+                console.log(`Found token ID: ${tokenId}`);
                 
-                // Fetch all owned NFTs
-                for (let i = 0; i < Number(balance); i++) {
-                    nftPromises.push((async () => {
-                        try {
-                            const tokenId = await brawlerBearzContract.tokenOfOwnerByIndex(address, i);
-                            const tokenUri = await brawlerBearzContract.tokenURI(tokenId);
-                            
-                            // Handle IPFS URIs
-                            const uri = tokenUri.replace('ipfs://', 'https://ipfs.io/ipfs/');
-                            const response = await fetch(uri);
-                            const metadata = await response.json();
-                            
-                            // Ensure image URLs are properly formatted
-                            if (metadata.image && metadata.image.startsWith('ipfs://')) {
-                                metadata.image = metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/');
-                            }
+                const tokenUri = await brawlerBearzContract.tokenURI(tokenId);
+                const uri = tokenUri.replace('ipfs://', 'https://ipfs.io/ipfs/');
+                console.log(`Fetching metadata from: ${uri}`);
+
+                nftPromises.push(
+                    fetch(uri)
+                        .then(res => res.json())
+                        .then(metadata => {
+                            // Process IPFS image URL if needed
+                            const imageUrl = metadata.image?.startsWith('ipfs://')
+                                ? metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/')
+                                : metadata.image;
+
+                            // Get faction from metadata
+                            const faction = metadata.attributes?.find((attr: any) => 
+                                attr.trait_type.toLowerCase() === 'faction'
+                            )?.value || 'UNKNOWN';
 
                             return {
                                 tokenId: tokenId.toString(),
-                                metadata
+                                metadata: {
+                                    name: metadata.name || `Brawler Bear #${tokenId}`,
+                                    image: imageUrl,
+                                    faction: faction.toUpperCase()
+                                }
                             };
-                        } catch (error) {
-                            console.error('Error fetching NFT:', error);
+                        })
+                        .catch(error => {
+                            console.error(`Error processing NFT ${tokenId}:`, error);
                             return null;
-                        }
-                    })());
-                }
-
-                const nftData = (await Promise.all(nftPromises)).filter(nft => nft !== null);
-                console.log('Fetched NFTs:', nftData);
-                
-                setNfts(nftData);
-                onNftsLoaded(nftData);
-                setToCache(nftData);
-            } else {
-                console.log('No Brawler Bearz NFTs found');
-                setNfts([]);
-                onNftsLoaded([]);
+                        })
+                );
             }
+
+            // Wait for all NFTs to be processed
+            const nftData = (await Promise.all(nftPromises)).filter(nft => nft !== null);
+            console.log('Successfully fetched NFTs:', nftData);
+
+            // Update state with fetched NFTs
+            onNftsLoaded(nftData);
+            setToCache(nftData);
+
         } catch (error) {
             console.error('Error fetching NFTs:', error);
             alert('Error fetching your Brawler Bearz. Please try again.');
@@ -190,28 +206,18 @@ export function WalletConnect({
                 const networkOk = await checkNetwork(provider);
                 if (!networkOk) return;
                 
+                // Only call if provided
+                onProviderSet?.(provider);
+                
                 // Check faction using getFaction function
                 const faction = await checkFaction(provider, address);
                 
                 if (faction) {
                     setAccount(address);
                     onWalletConnected(address);
-                    // Continue with Brawler Bearz NFT fetching
-                    const cached = getFromCache();
-                    if (cached) {
-                        setNfts(cached.nfts);
-                        onNftsLoaded(cached.nfts);
-                    } else {
-                        fetchNFTs(provider, address);
-                    }
-                } else {
-                    // Reset states if no faction found
-                    setAccount('');
-                    setNfts([]);
-                    onNftsLoaded([]);
+                    // Fetch NFTs after successful connection
+                    await fetchNFTs(provider, address);
                 }
-            } else {
-                alert('Please install MetaMask!');
             }
         } catch (error) {
             console.error('Error connecting wallet:', error);
