@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { GameState } from '../types/game';
+import { GameState, Square } from '../types/game';
 import { OptimizedImage } from './OptimizedImage';
 import { supabase } from '../lib/supabase';
 import { cleanExpiredCooldowns, getCooldownDetails } from '../utils/cooldownUtils';
@@ -57,7 +57,7 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
             const availableNfts = nfts.filter(bear => {
                 const tokenId = String(bear.tokenId);
                 const isUsed = initialGameState?.used_bears?.includes(tokenId);
-                const isInBattle = initialGameState?.squares?.some(square => 
+                const isInBattle = initialGameState?.squares?.some((square: Square) => 
                     square.bear?.tokenId === tokenId
                 );
                 return !isUsed && !isInBattle;
