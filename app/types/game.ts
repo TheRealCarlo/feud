@@ -67,7 +67,7 @@ export interface BattleResult {
     };
 }
 
-export interface Battle {
+export interface GameBattle {
     id: number;
     game_id: string;
     winning_faction: Faction;
