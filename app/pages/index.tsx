@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BrowserProvider } from 'ethers';
 import { WalletConnect } from '../components/WalletConnect';
-import { GameBoard } from '../components/GameBoard';
+import GameBoard from '../components/GameBoard';
 import { BearInventory } from '../components/BearInventory';
 import { Faction } from '../types/game';
 
