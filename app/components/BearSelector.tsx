@@ -68,7 +68,7 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
 
             // Process battle status
             if (initialGameState?.used_bears) {
-                initialGameState.used_bears.forEach(tokenId => {
+                initialGameState.used_bears.forEach((tokenId: string) => {
                     const normalizedTokenId = String(tokenId);
                     const bear = allBearsMap.get(normalizedTokenId);
                     if (bear && bear.status !== 'cooldown') {
