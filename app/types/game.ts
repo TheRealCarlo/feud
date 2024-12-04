@@ -102,4 +102,8 @@ export type Battle = {
         faction: Faction;
     };
     winner: 'attacker' | 'defender';
+    iron_squares: number;
+    geo_squares: number;
+    tech_squares: number;
+    paw_squares: number;
 }; 

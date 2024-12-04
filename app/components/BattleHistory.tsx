@@ -22,12 +22,12 @@ const BattleHistory: React.FC<BattleHistoryProps> = ({ userFaction }) => {
                     attacker: {
                         tokenId: 'unknown',
                         name: 'unknown',
-                        faction: 'unknown' as Faction
+                        faction: item.winning_faction
                     },
                     defender: {
                         tokenId: 'unknown',
                         name: 'unknown',
-                        faction: 'unknown' as Faction
+                        faction: userFaction
                     },
                     winner: item.winning_faction === userFaction ? 'attacker' : 'defender',
                     iron_squares: item.iron_squares,
@@ -64,42 +64,50 @@ const BattleHistory: React.FC<BattleHistoryProps> = ({ userFaction }) => {
 
     return (
         <div className="space-y-4">
-            {battles.map((battle) => (
-                <div 
-                    key={battle.timestamp}
-                    className="bg-gray-800 rounded-lg p-4 shadow-md"
-                >
-                    <div className="flex justify-between items-center mb-2">
-                        <div className="text-sm text-gray-400">
-                            {new Date(battle.timestamp).toLocaleDateString()}
+            {battles.map((battle) => {
+                // Determine the winning faction
+                const winningFaction = battle.winner === 'attacker' ? battle.attacker.faction : battle.defender.faction;
+                
+                return (
+                    <div 
+                        key={battle.timestamp}
+                        className="bg-gray-800 rounded-lg p-4 shadow-md"
+                    >
+                        <div className="flex justify-between items-center mb-2">
+                            <div className="text-sm text-gray-400">
+                                {new Date(battle.timestamp).toLocaleDateString()}
+                            </div>
+                            <div className={`px-2 py-1 rounded text-sm font-medium
+                                ${winningFaction === 'IRON' ? 'bg-blue-500/20 text-blue-400' :
+                                  winningFaction === 'GEO' ? 'bg-orange-500/20 text-orange-400' :
+                                  winningFaction === 'TECH' ? 'bg-purple-500/20 text-purple-400' :
+                                  winningFaction === 'PAW' ? 'bg-green-500/20 text-green-400' :
+                                  'bg-gray-500/20 text-gray-400'}`}
+                            >
+                                {winningFaction} Victory
+                            </div>
                         </div>
-                        <div className={`px-2 py-1 rounded text-sm font-medium
-                            ${battle.winner === 'attacker' ? 'bg-blue-500/20 text-blue-400' :
-                              'bg-gray-500/20 text-gray-400'}`}
-                        >
-                            {battle.winner} Victory
+                        <div className="grid grid-cols-4 gap-2 mt-2">
+                            <div className="text-center">
+                                <div className="text-sm text-blue-400">IRON</div>
+                                <div className="font-medium">{battle.iron_squares}</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-sm text-orange-400">GEO</div>
+                                <div className="font-medium">{battle.geo_squares}</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-sm text-purple-400">TECH</div>
+                                <div className="font-medium">{battle.tech_squares}</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-sm text-green-400">PAW</div>
+                                <div className="font-medium">{battle.paw_squares}</div>
+                            </div>
                         </div>
                     </div>
-                    <div className="grid grid-cols-4 gap-2 mt-2">
-                        <div className="text-center">
-                            <div className="text-sm text-blue-400">IRON</div>
-                            <div className="font-medium">{battle.iron_squares}</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-sm text-orange-400">GEO</div>
-                            <div className="font-medium">{battle.geo_squares}</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-sm text-purple-400">TECH</div>
-                            <div className="font-medium">{battle.tech_squares}</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-sm text-green-400">PAW</div>
-                            <div className="font-medium">{battle.paw_squares}</div>
-                        </div>
-                    </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 };
