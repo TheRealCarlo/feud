@@ -134,6 +134,86 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
         return `${hours}h ${minutes}m`;
     }, [cooldowns]);
 
+    // Add cooldown refresh interval
+    useEffect(() => {
+        // Initial fetch of cooldowns
+        const fetchCooldowns = async () => {
+            try {
+                const { data: cooldownData } = await supabase
+                    .from('cooldowns')
+                    .select('*')
+                    .eq('wallet_address', walletAddress);
+                
+                // Filter out expired cooldowns
+                const currentTime = Math.floor(Date.now() / 1000);
+                const activeCooldowns = cooldownData?.filter(cd => cd.end_time > currentTime) || [];
+                
+                console.log('Fetched cooldowns:', activeCooldowns);
+                setCooldowns(activeCooldowns);
+            } catch (error) {
+                console.error('Error fetching cooldowns:', error);
+            }
+        };
+
+        // Set up interval to check cooldowns
+        const intervalId = setInterval(async () => {
+            await fetchCooldowns();
+        }, 5000); // Check every 5 seconds
+
+        // Initial fetch
+        fetchCooldowns();
+
+        // Cleanup
+        return () => clearInterval(intervalId);
+    }, [walletAddress]);
+
+    // Process bears with updated cooldown status
+    useEffect(() => {
+        if (!nfts || !walletAddress) {
+            console.log('Missing nfts or wallet address:', { nfts: !!nfts, walletAddress });
+            return;
+        }
+
+        const processBears = () => {
+            const currentTime = Math.floor(Date.now() / 1000);
+            
+            // Filter out used bears and process cooldowns
+            const availableNfts = nfts.filter(bear => {
+                const isUsed = initialGameState?.used_bears?.includes(String(bear.tokenId));
+                return !isUsed;
+            });
+
+            const processedBearsArray = availableNfts.map(bear => {
+                const cooldown = cooldowns.find(c => 
+                    c.token_id === String(bear.tokenId) && 
+                    c.end_time > currentTime
+                );
+
+                return {
+                    ...bear,
+                    tokenId: String(bear.tokenId),
+                    status: cooldown ? 'cooldown' : 'ready',
+                    cooldownEnd: cooldown?.end_time,
+                    cooldownRemaining: cooldown
+                        ? getCooldownDetails(String(cooldown.end_time))
+                        : null
+                };
+            });
+
+            // Sort bears: ready first, then cooldown
+            const sortedBears = processedBearsArray.sort((a, b) => {
+                if (a.status === 'ready' && b.status === 'cooldown') return -1;
+                if (a.status === 'cooldown' && b.status === 'ready') return 1;
+                return 0;
+            });
+
+            setProcessedBears(sortedBears);
+            setLoading(false);
+        };
+
+        processBears();
+    }, [nfts, cooldowns, walletAddress, initialGameState?.used_bears]);
+
     return (
         <div className="bg-gray-900/95 backdrop-blur-lg rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden border border-gray-700">
             {/* Header */}

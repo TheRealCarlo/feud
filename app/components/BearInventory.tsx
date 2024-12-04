@@ -26,6 +26,7 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
     const [gameState, setGameState] = useState<any>(null);
     const [bearRecords, setBearRecords] = useState<BearRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const [processedBears, setProcessedBears] = useState<ProcessedBear[]>([]);
 
     useEffect(() => {
         console.log('BearInventory mounted with:', {
@@ -274,6 +275,64 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
         };
     };
 
+    // Add cooldown refresh interval
+    useEffect(() => {
+        const fetchCooldowns = async () => {
+            try {
+                const { data: cooldownData } = await supabase
+                    .from('cooldowns')
+                    .select('*')
+                    .eq('wallet_address', walletAddress);
+                
+                // Filter out expired cooldowns
+                const currentTime = Math.floor(Date.now() / 1000);
+                const activeCooldowns = cooldownData?.filter(cd => cd.end_time > currentTime) || [];
+                
+                setCooldowns(activeCooldowns);
+            } catch (error) {
+                console.error('Error fetching cooldowns:', error);
+            }
+        };
+
+        // Set up interval to check cooldowns
+        const intervalId = setInterval(async () => {
+            await fetchCooldowns();
+        }, 5000); // Check every 5 seconds
+
+        // Initial fetch
+        fetchCooldowns();
+
+        // Cleanup
+        return () => clearInterval(intervalId);
+    }, [walletAddress]);
+
+    // Process bears with cooldown status
+    useEffect(() => {
+        const processBears = () => {
+            const currentTime = Math.floor(Date.now() / 1000);
+            
+            const processedBearsArray = nfts.map(bear => {
+                const cooldown = cooldowns.find(c => 
+                    c.token_id === String(bear.tokenId) && 
+                    c.end_time > currentTime
+                );
+
+                return {
+                    ...bear,
+                    status: cooldown ? 'cooldown' : 'ready',
+                    cooldownEnd: cooldown?.end_time,
+                    cooldownRemaining: cooldown
+                        ? getCooldownDetails(String(cooldown.end_time))
+                        : null
+                };
+            });
+
+            setProcessedBears(processedBearsArray);
+        };
+
+        processBears();
+    }, [nfts, cooldowns]);
+
     return (
         <div className="p-4">
             <h2 className="text-2xl font-bold text-white mb-6">Your Bears</h2>
@@ -284,7 +343,7 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {nfts.map((nft) => {
+                    {processedBears.map((nft) => {
                         const bearState = getBearState(nft.tokenId);
                         const record = getBearRecord(nft.tokenId);
                         
