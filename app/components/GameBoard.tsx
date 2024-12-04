@@ -278,6 +278,12 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                 toast.success('Bear deployed successfully!');
             } else if (targetSquare.faction !== userFaction) {
                 // Attacking an enemy square
+                if (!targetSquare.bear) {
+                    console.error('Target square has no bear');
+                    toast.error('Invalid target square');
+                    return;
+                }
+
                 const attacker = {
                     ...selectedBear,
                     metadata: {
