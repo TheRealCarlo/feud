@@ -78,6 +78,17 @@ export interface GameBattle {
     completed_at: string;
 }
 
+export interface GameHistory {
+    id: number;
+    game_id: string;
+    winning_faction: Faction;
+    iron_squares: number;
+    geo_squares: number;
+    tech_squares: number;
+    paw_squares: number;
+    completed_at: string;
+}
+
 export type Battle = {
     timestamp: number;
     attacker: {
