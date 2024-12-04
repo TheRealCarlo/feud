@@ -241,6 +241,12 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
             return;
         }
 
+        if (!provider) {
+            console.error('No provider available');
+            toast.error('Please connect your wallet');
+            return;
+        }
+
         try {
             setIsBattling(true);
             const targetSquare = gameState.squares[selectedSquareId];
