@@ -86,17 +86,18 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
             });
 
             // Process each bear with its cooldown status
-            const processedBearsArray = availableNfts.map(bear => ({
-                ...bear,
-                tokenId: String(bear.tokenId),
-                status: cooldowns.find(c => c.token_id === String(bear.tokenId))
-                    ? 'cooldown'
-                    : 'ready',
-                cooldownEnd: cooldowns.find(c => c.token_id === String(bear.tokenId))?.end_time,
-                cooldownRemaining: cooldowns.find(c => c.token_id === String(bear.tokenId))
-                    ? getCooldownDetails(cooldowns.find(c => c.token_id === String(bear.tokenId))!.end_time)
-                    : null
-            }));
+            const processedBearsArray = availableNfts.map(bear => {
+                const cooldown = cooldowns.find(c => c.token_id === String(bear.tokenId));
+                return {
+                    ...bear,
+                    tokenId: String(bear.tokenId),
+                    status: cooldown ? 'cooldown' : 'ready',
+                    cooldownEnd: cooldown?.end_time,
+                    cooldownRemaining: cooldown
+                        ? getCooldownDetails(String(cooldown.end_time))
+                        : null
+                };
+            });
 
             // Sort bears: ready first, then cooldown
             const sortedBears = processedBearsArray.sort((a, b) => {
