@@ -127,7 +127,7 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
             );
             
             // Filter out bears that are neither in cooldown nor on the board
-            const updatedUsedBears = gameState.used_bears.filter(tokenId => 
+            const updatedUsedBears = gameState.used_bears.filter((tokenId: string) => 
                 cooldownTokenIds.has(String(tokenId)) || activeTokenIds.has(String(tokenId))
             );
 
