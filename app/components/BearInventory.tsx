@@ -134,7 +134,7 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
             console.log('Cleaning used bears:', {
                 before: gameState.used_bears.length,
                 after: updatedUsedBears.length,
-                removed: gameState.used_bears.filter(id => !updatedUsedBears.includes(id)),
+                removed: gameState.used_bears.filter((id: string) => !updatedUsedBears.includes(id)),
                 activeBears: Array.from(activeTokenIds),
                 cooldownBears: Array.from(cooldownTokenIds)
             });
