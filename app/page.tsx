@@ -7,6 +7,7 @@ import { Navigation } from './components/Navigation'
 import { Faction } from './types/game'
 import { ErrorBoundary } from './components/ErrorBoundary';
 import BattleHistory from './components/BattleHistory';
+import { BrowserProvider } from 'ethers';
 
 // Dynamically import heavy components
 const GameBoard = dynamic(() => import('./components/GameBoard'), {
@@ -24,10 +25,11 @@ const Leaderboard = dynamic(() => import('./components/Leaderboard'), {
 type View = 'game' | 'inventory' | 'history' | 'leaderboard';
 
 export default function Home() {
-  const [userFaction, setUserFaction] = useState<Faction | null>(null)
+  const [userFaction, setUserFaction] = useState<Faction | null>(null);
   const [nfts, setNfts] = useState<any[]>([]);
   const [activeView, setActiveView] = useState<View>('game');
   const [walletAddress, setWalletAddress] = useState<string>('');
+  const [provider, setProvider] = useState<BrowserProvider | null>(null);
 
   const handleFactionDetermined = (faction: Faction) => {
     setUserFaction(faction);
@@ -36,6 +38,17 @@ export default function Home() {
   const handleGameStart = () => {
     console.log('Game started!');
     // Add any game start logic here
+  };
+
+  const handleProviderSet = (newProvider: BrowserProvider) => {
+    setProvider(newProvider);
+  };
+
+  const handleWalletDisconnect = () => {
+    setProvider(null);
+    setWalletAddress('');
+    setUserFaction(null);
+    setNfts([]);
   };
 
   const renderActiveView = () => {
@@ -49,6 +62,8 @@ export default function Home() {
             nfts={nfts}
             onGameStart={handleGameStart}
             walletAddress={walletAddress}
+            provider={provider}
+            onWalletDisconnect={handleWalletDisconnect}
           />
         );
       case 'inventory':
@@ -95,6 +110,7 @@ export default function Home() {
                 onFactionDetermined={handleFactionDetermined}
                 onNftsLoaded={setNfts}
                 onWalletConnected={setWalletAddress}
+                onProviderSet={handleProviderSet}
               />
 
               {userFaction && (
