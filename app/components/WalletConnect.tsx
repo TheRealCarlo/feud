@@ -64,9 +64,14 @@ const getFactionColor = (faction: Faction): string => {
     return `${FACTION_COLORS[faction].primary} ${FACTION_COLORS[faction].text}`;
 };
 
-export function WalletConnect({ onFactionDetermined, onNftsLoaded }: { 
+export function WalletConnect({ 
+    onFactionDetermined, 
+    onNftsLoaded,
+    onWalletConnected 
+}: { 
     onFactionDetermined: (faction: Faction) => void;
     onNftsLoaded: (nfts: any[]) => void;
+    onWalletConnected: (address: string) => void;
 }) {
     const [account, setAccount] = useState<string>('');
     const [nfts, setNfts] = useState<any[]>([]);
@@ -190,6 +195,7 @@ export function WalletConnect({ onFactionDetermined, onNftsLoaded }: {
                 
                 if (faction) {
                     setAccount(address);
+                    onWalletConnected(address);
                     // Continue with Brawler Bearz NFT fetching
                     const cached = getFromCache();
                     if (cached) {
