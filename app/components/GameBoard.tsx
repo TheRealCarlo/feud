@@ -278,6 +278,13 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                     } as GameState;  // Ensure the return type matches GameState
                 });
             } else if (targetSquare.faction !== userFaction) {
+                // Check if provider exists
+                if (!provider) {
+                    console.error('No provider available');
+                    toast.error('Wallet connection required for battles');
+                    return;
+                }
+
                 // Attacking an enemy square
                 if (!targetSquare.bear) {
                     console.error('Target square has no bear');
