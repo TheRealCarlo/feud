@@ -20,45 +20,56 @@ export default function Leaderboard() {
     useEffect(() => {
         const fetchLeaderboard = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('leaderboard')
+                // First get the top bears by wins
+                const { data: bearRecords, error: bearError } = await supabase
+                    .from('bear_records')
                     .select('*')
-                    .order('win_rate', { ascending: false })
                     .order('wins', { ascending: false })
                     .limit(10);
 
-                if (error) {
-                    throw error;
-                }
+                if (bearError) throw bearError;
 
-                if (data) {
-                    setTopBears(data);
-                }
+                // Then get the latest battle for each bear to get their metadata
+                const bearPromises = bearRecords.map(async (record) => {
+                    const { data: battles, error: battleError } = await supabase
+                        .from('battles')
+                        .select('*')
+                        .or(`attacker_token_id.eq.${record.token_id},defender_token_id.eq.${record.token_id}`)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .single();
+
+                    if (battleError) {
+                        console.warn(`Could not fetch battle data for bear ${record.token_id}:`, battleError);
+                        return null;
+                    }
+
+                    const isAttacker = battles?.attacker_token_id === record.token_id;
+                    
+                    return {
+                        tokenId: record.token_id,
+                        name: isAttacker ? battles?.attacker_name : battles?.defender_name,
+                        image: isAttacker ? battles?.attacker_image : battles?.defender_image,
+                        faction: isAttacker ? battles?.attacker_faction : battles?.defender_faction,
+                        wins: record.wins,
+                        losses: record.losses,
+                        win_rate: record.wins + record.losses > 0 
+                            ? (record.wins / (record.wins + record.losses)) * 100 
+                            : 0
+                    };
+                });
+
+                const processedBears = (await Promise.all(bearPromises)).filter(Boolean) as BearStats[];
+                setTopBears(processedBears);
+                setIsLoading(false);
+
             } catch (error) {
                 console.error('Error fetching leaderboard:', error);
-            } finally {
                 setIsLoading(false);
             }
         };
 
         fetchLeaderboard();
-
-        const leaderboardSubscription = supabase
-            .channel('leaderboard_changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'leaderboard'
-                },
-                fetchLeaderboard
-            )
-            .subscribe();
-
-        return () => {
-            leaderboardSubscription.unsubscribe();
-        };
     }, []);
 
     if (isLoading) {

@@ -349,6 +349,25 @@ export default function BearInventory({ nfts, userFaction, walletAddress }: Bear
         processBears();
     }, [nfts, cooldowns]);
 
+    useEffect(() => {
+        const fetchBearRecords = async () => {
+            try {
+                const { data: records } = await supabase
+                    .from('bear_records')
+                    .select('*')
+                    .in('token_id', nfts.map(bear => bear.tokenId));
+
+                setBearRecords(records || []);
+            } catch (error) {
+                console.error('Error fetching bear records:', error);
+            }
+        };
+
+        if (nfts.length > 0) {
+            fetchBearRecords();
+        }
+    }, [nfts]);
+
     return (
         <div className="p-4">
             <h2 className="text-2xl font-bold text-white mb-6">Your Bears</h2>

@@ -348,6 +348,14 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
 
                     toast.dismiss(battleToast);
                     
+                    // Record battle outcome with "attacker" or "defender"
+                    await handleBattleOutcome(
+                        attacker,
+                        defender,
+                        attackerWins ? "attacker" : "defender",
+                        selectedSquareId
+                    );
+                    
                     if (attackerWins) {
                         // Handle victory logic
                         toast.success('Victory! Square captured!');
@@ -382,22 +390,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
                     } else {
                         // Handle defeat logic
                         toast.error('Defeat! Better luck next time!');
-                        
-                        // Add cooldown for the attacker
-                        const cooldownEnd = Math.floor(Date.now() / 1000) + (60 * 60); // 1 hour cooldown
-                        const { error: cooldownError } = await supabase
-                            .from('cooldowns')
-                            .insert({
-                                token_id: attacker.tokenId,
-                                end_time: cooldownEnd,
-                                wallet_address: walletAddress
-                            });
-
-                        if (cooldownError) {
-                            console.error('Error adding cooldown:', cooldownError);
-                        } else {
-                            console.log('Cooldown added for attacker:', attacker.tokenId);
-                        }
+                        await handleCooldown(attacker);
                     }
                 } catch (battleError) {
                     console.error('Battle error:', battleError);
@@ -484,6 +477,166 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
         const minutes = Math.floor((seconds % 3600) / 60);
         const secs = seconds % 60;
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    // Define the updateBearRecord function
+    const updateBearRecord = async (tokenId: string, isWinner: boolean) => {
+        try {
+            // First try to get the existing record
+            const { data: records, error: fetchError } = await supabase
+                .from('bear_records')
+                .select('*')
+                .eq('token_id', tokenId);
+
+            if (fetchError) {
+                console.error('Error fetching bear record:', fetchError);
+                throw fetchError;
+            }
+
+            const existingRecord = records?.[0];
+
+            if (existingRecord) {
+                // Update existing record
+                const { error: updateError } = await supabase
+                    .from('bear_records')
+                    .update({
+                        wins: isWinner ? existingRecord.wins + 1 : existingRecord.wins,
+                        losses: isWinner ? existingRecord.losses : existingRecord.losses + 1,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('token_id', tokenId);
+
+                if (updateError) {
+                    console.error('Error updating bear record:', updateError);
+                    throw updateError;
+                }
+            } else {
+                // Insert new record
+                const { error: insertError } = await supabase
+                    .from('bear_records')
+                    .insert([{
+                        token_id: tokenId,
+                        wins: isWinner ? 1 : 0,
+                        losses: isWinner ? 0 : 1,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    }]);
+
+                if (insertError) {
+                    console.error('Error inserting bear record:', insertError);
+                    throw insertError;
+                }
+            }
+        } catch (error) {
+            console.error('Error in updateBearRecord:', error);
+            // Don't throw the error, just log it
+        }
+    };
+
+    // Use the updateBearRecord function in handleBattleOutcome
+    const handleBattleOutcome = async (
+        attacker: any,
+        defender: any,
+        winner: string,
+        targetSquareId: number
+    ) => {
+        try {
+            // First update the bear_records table
+            await Promise.all([
+                updateBearRecord(attacker.tokenId, winner === "attacker"),
+                updateBearRecord(defender.tokenId, winner === "defender")
+            ]);
+
+            // Then create the battle record
+            const battleRecord = {
+                attacker_id: walletAddress,
+                attacker_name: attacker.metadata.name,
+                attacker_faction: attacker.metadata.faction,
+                attacker_token_id: attacker.tokenId.toString(),
+                defender_id: defender.metadata.owner || walletAddress,
+                defender_name: defender.metadata.name,
+                defender_faction: defender.metadata.faction,
+                defender_token_id: defender.tokenId.toString(),
+                winner: winner,
+                created_at: new Date().toISOString(),
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('Attempting to insert battle record:', battleRecord);
+
+            // Use upsert with onConflict: ignore
+            const { error: battleError } = await supabase
+                .from('battles')
+                .insert([battleRecord])
+                .select()
+                .single();
+
+            if (battleError) {
+                console.error('Battle insert error:', battleError);
+                throw battleError;
+            }
+
+            console.log('Battle recorded successfully');
+
+            // Optionally update cooldowns here if needed
+            try {
+                await handleCooldown(attacker);
+            } catch (cooldownError) {
+                console.error('Cooldown error:', cooldownError);
+                // Don't throw the error as the battle was recorded successfully
+            }
+
+        } catch (error) {
+            console.error('Error recording battle:', error);
+            if (error instanceof Error) {
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack
+                });
+            }
+            toast.error('Failed to record battle results');
+        }
+    };
+
+    const handleCooldown = async (attacker: any) => {
+        try {
+            const cooldownEnd = Math.floor(Date.now() / 1000) + (60 * 60); // 1 hour cooldown
+            
+            // First check if cooldown already exists
+            const { data: existingCooldown } = await supabase
+                .from('cooldowns')
+                .select('*')
+                .eq('token_id', attacker.tokenId)
+                .eq('wallet_address', walletAddress)
+                .single();
+
+            if (existingCooldown) {
+                // Update existing cooldown
+                const { error: updateError } = await supabase
+                    .from('cooldowns')
+                    .update({ end_time: cooldownEnd })
+                    .eq('token_id', attacker.tokenId)
+                    .eq('wallet_address', walletAddress);
+
+                if (updateError) throw updateError;
+            } else {
+                // Insert new cooldown
+                const { error: insertError } = await supabase
+                    .from('cooldowns')
+                    .insert({
+                        token_id: attacker.tokenId,
+                        end_time: cooldownEnd,
+                        wallet_address: walletAddress
+                    });
+
+                if (insertError) throw insertError;
+            }
+
+            console.log('Cooldown handled for attacker:', attacker.tokenId);
+        } catch (error) {
+            console.error('Error handling cooldown:', error);
+            // Don't throw error here, just log it
+        }
     };
 
     return (
