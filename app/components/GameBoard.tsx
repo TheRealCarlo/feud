@@ -309,6 +309,11 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
             } else if (targetSquare.faction !== userFaction) {
                 // Battle logic
                 console.log('Initiating battle');
+                
+                if (!targetSquare.bear) {
+                    throw new Error('No bear found in target square');
+                }
+
                 const attacker = {
                     ...selectedBear,
                     metadata: {
