@@ -37,6 +37,7 @@ export default function Home() {
                     <BearInventory
                         nfts={nfts}
                         userFaction={userFaction}
+                        walletAddress={walletAddress}
                     />
                 </>
             )}

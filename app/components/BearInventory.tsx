@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { OptimizedImage } from './OptimizedImage';
 import { supabase } from '../lib/supabase';
 import { Faction, Square } from '../types/game';
+import { getCooldownDetails } from '../utils/cooldown';
 
 interface Cooldown {
     token_id: string;
@@ -16,12 +17,25 @@ interface BearRecord {
     losses: number;
 }
 
+interface ProcessedBear {
+    tokenId: string;
+    metadata: {
+        name: string;
+        image: string;
+        faction: Faction;
+    };
+    status: 'ready' | 'cooldown';
+    cooldownEnd?: number;
+    cooldownRemaining: string | null;
+}
+
 interface BearInventoryProps {
     nfts: any[];
     userFaction: Faction;
+    walletAddress: string;
 }
 
-export default function BearInventory({ nfts, userFaction }: BearInventoryProps) {
+export default function BearInventory({ nfts, userFaction, walletAddress }: BearInventoryProps) {
     const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
     const [gameState, setGameState] = useState<any>(null);
     const [bearRecords, setBearRecords] = useState<BearRecord[]>([]);
@@ -277,6 +291,8 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
 
     // Add cooldown refresh interval
     useEffect(() => {
+        if (!walletAddress) return;
+
         const fetchCooldowns = async () => {
             try {
                 const { data: cooldownData } = await supabase

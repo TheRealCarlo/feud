@@ -2,6 +2,27 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { GameState } from '../types/game';
 import { supabase } from '../lib/supabase';
 import { cleanExpiredCooldowns, getCooldownDetails } from '../utils/cooldownUtils';
+import { OptimizedImage } from './OptimizedImage';
+import { Faction } from '../types/game';
+
+interface Cooldown {
+    token_id: string;
+    end_time: number;
+    wallet_address: string;
+    created_at?: string;
+}
+
+interface ProcessedBear {
+    tokenId: string;
+    metadata: {
+        name: string;
+        image: string;
+        faction: Faction;
+    };
+    status: 'ready' | 'cooldown';
+    cooldownEnd?: number;
+    cooldownRemaining: string | null;
+}
 
 interface BearSelectorProps {
     nfts: any[];
@@ -12,17 +33,10 @@ interface BearSelectorProps {
     walletAddress: string;
 }
 
-interface Cooldown {
-    token_id: string;
-    end_time: number;
-    wallet_address: string;
-    created_at?: string;
-}
-
 export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameState, isBattle, walletAddress }: BearSelectorProps) {
     const [cooldowns, setCooldowns] = useState<Cooldown[]>([]);
     const [loading, setLoading] = useState(true);
-    const [processedBears, setProcessedBears] = useState<any[]>([]);
+    const [processedBears, setProcessedBears] = useState<ProcessedBear[]>([]);
 
     // Add this debug logging effect
     useEffect(() => {
