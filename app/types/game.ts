@@ -38,7 +38,7 @@ export interface Square {
 }
 
 export interface GameState {
-    id?: number;
+    id: string;
     squares: Square[];
     is_active: boolean;
     created_at: string;

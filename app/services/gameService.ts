@@ -151,7 +151,7 @@ export class GameService {
                     }
                 });
 
-                if (winningFaction) {
+                if (winningFaction && gameState.id) {
                     await this.recordGameResult(gameState.id, winningFaction, factionCounts);
 
                     await supabase
