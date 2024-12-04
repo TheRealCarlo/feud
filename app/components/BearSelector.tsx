@@ -107,13 +107,6 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
         return `${hours}h ${minutes}m`;
     }, [cooldowns]);
 
-    // Filter bears to only show Ready and Cooldown states
-    const availableBears = useMemo(() => {
-        return processedBears.filter(bear => 
-            bear.status === 'ready' || bear.status === 'cooldown'
-        );
-    }, [processedBears]);
-
     return (
         <div className="bg-gray-900/95 backdrop-blur-lg rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden border border-gray-700">
             {/* Header */}
@@ -149,14 +142,9 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
                     <div className="flex justify-center items-center py-12">
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-600 border-t-blue-500"></div>
                     </div>
-                ) : availableBears.length === 0 ? (
-                    <div className="text-center py-12">
-                        <p className="text-gray-400">No bears available at the moment.</p>
-                        <p className="text-gray-500 text-sm mt-2">All your bears are currently in battle.</p>
-                    </div>
                 ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {availableBears.map((nft) => {
+                        {processedBears.map((nft) => {
                             const cooldownTime = getCooldownTimeRemaining(nft.tokenId);
                             const inCooldown = isInCooldown(nft.tokenId);
                             

@@ -122,8 +122,8 @@ export default function BearInventory({ nfts, userFaction }: BearInventoryProps)
             const cooldownTokenIds = new Set(activeCooldowns?.map(c => c.token_id) || []);
             const activeTokenIds = new Set(
                 gameState.squares
-                    .filter(square => square?.bear)
-                    .map(square => String(square.bear.tokenId))
+                    .filter((square: Square) => square?.bear)
+                    .map((square: Square) => String(square.bear.tokenId))
             );
             
             // Filter out bears that are neither in cooldown nor on the board
