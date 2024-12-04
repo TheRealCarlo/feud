@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEffect, useState } from 'react';
 import { gameService } from '../services/gameService';
-import { Battle, Faction } from '../types/game';
+import { Battle, Faction, GameHistory } from '../types/game';
 
 interface BattleHistoryProps {
     userFaction: Faction;
@@ -17,7 +17,18 @@ const BattleHistory: React.FC<BattleHistoryProps> = ({ userFaction }) => {
             try {
                 setLoading(true);
                 const history = await gameService.getGameHistory();
-                setBattles(history);
+                // Transform GameHistory to Battle type
+                const transformedBattles: Battle[] = history.map((item: GameHistory) => ({
+                    id: item.id,
+                    game_id: item.game_id,
+                    winning_faction: item.winning_faction,
+                    iron_squares: item.iron_squares,
+                    geo_squares: item.geo_squares,
+                    tech_squares: item.tech_squares,
+                    paw_squares: item.paw_squares,
+                    completed_at: item.completed_at
+                }));
+                setBattles(transformedBattles);
             } catch (error) {
                 console.error('Error fetching battle history:', error);
             } finally {
@@ -59,7 +70,8 @@ const BattleHistory: React.FC<BattleHistoryProps> = ({ userFaction }) => {
                             ${battle.winning_faction === 'IRON' ? 'bg-blue-500/20 text-blue-400' :
                               battle.winning_faction === 'GEO' ? 'bg-orange-500/20 text-orange-400' :
                               battle.winning_faction === 'TECH' ? 'bg-purple-500/20 text-purple-400' :
-                              'bg-green-500/20 text-green-400'}`}
+                              battle.winning_faction === 'PAW' ? 'bg-green-500/20 text-green-400' :
+                              'bg-gray-500/20 text-gray-400'}`}
                         >
                             {battle.winning_faction} Victory
                         </div>
@@ -88,5 +100,4 @@ const BattleHistory: React.FC<BattleHistoryProps> = ({ userFaction }) => {
     );
 };
 
-// Make sure to use a default export
 export default BattleHistory; 
