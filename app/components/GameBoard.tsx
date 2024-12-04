@@ -268,12 +268,15 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                     throw updateError;
                 }
 
-                // Update local game state
-                setGameState(prevState => ({
-                    ...prevState,
-                    squares: updatedSquares,
-                    used_bears: [...(prevState?.used_bears || []), selectedBear.tokenId]
-                }));
+                // Update local game state with proper typing
+                setGameState(prevState => {
+                    if (!prevState) return null;
+                    return {
+                        ...prevState,
+                        squares: updatedSquares,
+                        used_bears: [...(prevState.used_bears || []), selectedBear.tokenId]
+                    } as GameState;  // Ensure the return type matches GameState
+                });
             } else if (targetSquare.faction !== userFaction) {
                 // Attacking an enemy square
                 if (!targetSquare.bear) {
