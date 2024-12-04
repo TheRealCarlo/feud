@@ -69,7 +69,7 @@ export function Menu({ gameState, userFaction, userAddress }: MenuProps) {
             />
 
             {/* Bear Selector Modal */}
-            {showBearSelector && (
+            {showBearSelector && selectedSquareId !== null && (
                 <BearSelector
                     nfts={[]} // Pass your NFTs here
                     onSelect={handleBearSelect}
@@ -78,7 +78,8 @@ export function Menu({ gameState, userFaction, userAddress }: MenuProps) {
                         setSelectedSquareId(null);
                     }}
                     gameState={gameState}
-                    isBattle={!!gameState.squares[selectedSquareId!]?.faction}
+                    isBattle={!!gameState.squares[selectedSquareId]?.faction}
+                    walletAddress={userAddress}
                 />
             )}
         </div>
