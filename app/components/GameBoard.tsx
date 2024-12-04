@@ -14,6 +14,7 @@ interface GameBoardProps {
     onGameStart: () => void;
     walletAddress: string;
     provider: BrowserProvider | null;
+    onWalletDisconnect?: () => void;
 }
 
 interface Cooldown {
@@ -36,7 +37,14 @@ const getFactionColor = (faction: Faction): string => {
     }
 };
 
-const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onGameStart, walletAddress, provider }) => {
+const GameBoard: React.FC<GameBoardProps> = React.memo(({ 
+    userFaction, 
+    nfts, 
+    onGameStart, 
+    walletAddress, 
+    provider,
+    onWalletDisconnect
+}) => {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [selectedSquareId, setSelectedSquareId] = useState<number | null>(null);
     const [showBearSelector, setShowBearSelector] = useState(false);
@@ -64,7 +72,6 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
             // Handle account changes
             window.ethereum.on('accountsChanged', (accounts: string[]) => {
                 if (accounts.length === 0) {
-                    // Handle disconnect
                     onWalletDisconnect?.();
                 }
             });
@@ -81,7 +88,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({ userFaction, nfts, onG
                 window.ethereum.removeListener('chainChanged', () => {});
             }
         };
-    }, []);
+    }, [onWalletDisconnect]);
 
     const refreshGameState = useCallback(async () => {
         try {
