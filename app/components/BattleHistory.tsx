@@ -1,5 +1,4 @@
-import React from 'react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { gameService } from '../services/gameService';
 import { Battle, Faction, GameHistory } from '../types/game';
 
@@ -19,14 +18,22 @@ const BattleHistory: React.FC<BattleHistoryProps> = ({ userFaction }) => {
                 const history = await gameService.getGameHistory();
                 // Transform GameHistory to Battle type
                 const transformedBattles: Battle[] = history.map((item: GameHistory) => ({
-                    id: item.id,
-                    game_id: item.game_id,
-                    winning_faction: item.winning_faction,
+                    timestamp: new Date(item.completed_at).getTime(),
+                    attacker: {
+                        tokenId: 'unknown',
+                        name: 'unknown',
+                        faction: 'unknown' as Faction
+                    },
+                    defender: {
+                        tokenId: 'unknown',
+                        name: 'unknown',
+                        faction: 'unknown' as Faction
+                    },
+                    winner: item.winning_faction === userFaction ? 'attacker' : 'defender',
                     iron_squares: item.iron_squares,
                     geo_squares: item.geo_squares,
                     tech_squares: item.tech_squares,
-                    paw_squares: item.paw_squares,
-                    completed_at: item.completed_at
+                    paw_squares: item.paw_squares
                 }));
                 setBattles(transformedBattles);
             } catch (error) {
@@ -37,7 +44,7 @@ const BattleHistory: React.FC<BattleHistoryProps> = ({ userFaction }) => {
         };
 
         fetchBattles();
-    }, []);
+    }, [userFaction]);
 
     if (loading) {
         return (
@@ -59,21 +66,18 @@ const BattleHistory: React.FC<BattleHistoryProps> = ({ userFaction }) => {
         <div className="space-y-4">
             {battles.map((battle) => (
                 <div 
-                    key={battle.id}
+                    key={battle.timestamp}
                     className="bg-gray-800 rounded-lg p-4 shadow-md"
                 >
                     <div className="flex justify-between items-center mb-2">
                         <div className="text-sm text-gray-400">
-                            {new Date(battle.completed_at).toLocaleDateString()}
+                            {new Date(battle.timestamp).toLocaleDateString()}
                         </div>
                         <div className={`px-2 py-1 rounded text-sm font-medium
-                            ${battle.winning_faction === 'IRON' ? 'bg-blue-500/20 text-blue-400' :
-                              battle.winning_faction === 'GEO' ? 'bg-orange-500/20 text-orange-400' :
-                              battle.winning_faction === 'TECH' ? 'bg-purple-500/20 text-purple-400' :
-                              battle.winning_faction === 'PAW' ? 'bg-green-500/20 text-green-400' :
+                            ${battle.winner === 'attacker' ? 'bg-blue-500/20 text-blue-400' :
                               'bg-gray-500/20 text-gray-400'}`}
                         >
-                            {battle.winning_faction} Victory
+                            {battle.winner} Victory
                         </div>
                     </div>
                     <div className="grid grid-cols-4 gap-2 mt-2">
