@@ -139,7 +139,7 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
             <div className="p-6 border-b border-gray-700/50">
                 <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                        {isBattle ? 'Choose Your Fighter' : 'Deploy Your Bear'}
+                        {isBattle ? 'Choose Your Brawler' : 'Deploy Your Bear'}
                     </h2>
                     <button
                         onClick={onClose}
