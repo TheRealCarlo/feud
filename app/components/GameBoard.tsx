@@ -553,7 +553,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
             ]);
 
             if (gameState) {
-                let updatedUsedBears = [...gameState.used_bears];
+                let updatedUsedBears = [...(gameState.used_bears || [])];
                 const twoHourCooldown = Math.floor(Date.now() / 1000) + (2 * 60 * 60); // 2 hours
 
                 if (winner === "defender") {
