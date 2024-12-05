@@ -3,6 +3,7 @@ import { OptimizedImage } from './OptimizedImage';
 import { supabase } from '../lib/supabase';
 import { Faction, Square } from '../types/game';
 import { getCooldownDetails } from '../utils/cooldown';
+import { BearState, BearStatus, Bear } from '../types/bear';
 
 interface Cooldown {
     token_id: string;
@@ -17,14 +18,8 @@ interface BearRecord {
     losses: number;
 }
 
-interface ProcessedBear {
-    tokenId: string;
-    metadata: {
-        name: string;
-        image: string;
-        faction: Faction;
-    };
-    status: 'ready' | 'cooldown';
+interface ProcessedBear extends Bear {
+    status: BearStatus;
     cooldownEnd?: number;
     cooldownRemaining: string | null;
 }
@@ -105,12 +100,33 @@ export default function BearInventory({ nfts, userFaction, walletAddress }: Bear
 
     const isBearDeployed = (tokenId: string) => {
         if (!gameState?.squares) {
+            console.log('No squares available in game state:', {
+                gameStateExists: !!gameState,
+                squaresExist: !!gameState?.squares
+            });
             return false;
         }
         
-        return gameState.squares.some((square: Square) => 
-            square?.bear?.tokenId === String(tokenId)
-        );
+        const isDeployed = gameState.squares.some((square: Square) => {
+            const bearMatch = square?.bear?.tokenId === String(tokenId);
+            if (bearMatch) {
+                console.log('Found deployed bear:', {
+                    tokenId,
+                    square,
+                    bearTokenId: square?.bear?.tokenId
+                });
+            }
+            return bearMatch;
+        });
+
+        console.log('Bear deployment check:', {
+            tokenId,
+            isDeployed,
+            squaresCount: gameState.squares.length,
+            gameStateId: gameState.id
+        });
+        
+        return isDeployed;
     };
 
     const isInBattle = (tokenId: string) => {
@@ -123,6 +139,7 @@ export default function BearInventory({ nfts, userFaction, walletAddress }: Bear
             inUsedBears,
             bearInCooldown,
             activeOnBoard,
+            gameStateId: gameState?.id,
             used_bears: gameState?.used_bears,
             shouldBeInBattle: activeOnBoard && !bearInCooldown
         });
@@ -177,63 +194,115 @@ export default function BearInventory({ nfts, userFaction, walletAddress }: Bear
     };
 
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchGameState = async () => {
             try {
-                // Clean expired cooldowns first
-                await cleanExpiredCooldowns();
-                
-                // Then fetch current cooldowns
-                const { data: cooldownData, error: cooldownError } = await supabase
-                    .from('cooldowns')
-                    .select('*')
-                    .gt('end_time', Math.floor(Date.now() / 1000));
-
-                if (cooldownError) {
-                    console.error('Error fetching cooldowns:', cooldownError);
-                } else {
-                    console.log('Fetched cooldowns:', cooldownData);
-                    setCooldowns(cooldownData || []);
+                setLoading(true);
+                if (!walletAddress) {
+                    console.log('No wallet address available');
+                    return;
                 }
 
-                // Clean used bears list
-                await cleanUsedBears();
-
-                // Fetch current game state
-                const { data: gameData, error: gameError } = await supabase
+                // First, get all active games to check the situation
+                const { data: activeGames, error: activeGamesError } = await supabase
                     .from('games')
                     .select('*')
+                    .eq('wallet_address', walletAddress)
                     .eq('is_active', true)
-                    .single();
+                    .order('created_at', { ascending: false });
 
-                if (gameError) {
-                    console.error('Error fetching game state:', gameError);
-                } else {
-                    console.log('Fetched game state:', gameData);
-                    setGameState(gameData);
+                console.log('Active games found:', {
+                    count: activeGames?.length,
+                    games: activeGames
+                });
+
+                if (activeGamesError) {
+                    console.error('Error fetching active games:', activeGamesError);
+                    return;
                 }
 
-                // Fetch bear records
-                const { data: recordData, error: recordError } = await supabase
-                    .from('bear_records')
-                    .select('*');
+                // If we have multiple active games, deactivate all but the most recent
+                if (activeGames && activeGames.length > 1) {
+                    console.log('Multiple active games found. Cleaning up...');
+                    
+                    // Keep the most recent game
+                    const mostRecentGame = activeGames[0];
+                    const gamesToDeactivate = activeGames.slice(1);
+                    
+                    // Deactivate older games
+                    const { error: deactivateError } = await supabase
+                        .from('games')
+                        .update({ is_active: false })
+                        .in('id', gamesToDeactivate.map(g => g.id));
 
-                if (recordError) {
-                    console.error('Error fetching bear records:', recordError);
-                } else {
-                    console.log('Fetched bear records:', recordData);
-                    setBearRecords(recordData || []);
+                    if (deactivateError) {
+                        console.error('Error deactivating old games:', deactivateError);
+                    } else {
+                        console.log('Successfully deactivated old games');
+                    }
+
+                    setGameState(mostRecentGame);
+                } 
+                // If we have exactly one active game, use it
+                else if (activeGames && activeGames.length === 1) {
+                    console.log('Found single active game:', {
+                        id: activeGames[0].id,
+                        squaresCount: activeGames[0].squares?.length,
+                        usedBears: activeGames[0].used_bears
+                    });
+                    setGameState(activeGames[0]);
                 }
-            } catch (err) {
-                console.error('Error fetching data:', err);
+                // If we have no active games, create a new one
+                else {
+                    console.log('No active games found. Creating new game...');
+                    
+                    const newGameData = {
+                        wallet_address: walletAddress,
+                        squares: Array(64).fill(null).map((_, index) => ({
+                            id: index,
+                            bear: null,
+                            faction: null
+                        })),
+                        used_bears: [],
+                        is_active: true,
+                        end_time: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
+                    };
+
+                    const { data: newGame, error: createError } = await supabase
+                        .from('games')
+                        .insert([newGameData])
+                        .select()
+                        .single();
+
+                    if (createError) {
+                        console.error('Error creating new game:', createError);
+                    } else {
+                        console.log('Created new game:', {
+                            id: newGame.id,
+                            squaresCount: newGame.squares?.length
+                        });
+                        setGameState(newGame);
+                    }
+                }
+            } catch (error) {
+                console.error('Unexpected error in fetchGameState:', error);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchData();
-        const intervalId = setInterval(fetchData, 10000);
+        if (walletAddress) {
+            fetchGameState();
+        }
+
+        // Set up polling for game state updates
+        const intervalId = setInterval(() => {
+            if (walletAddress) {
+                fetchGameState();
+            }
+        }, 10000);
+
         return () => clearInterval(intervalId);
-    }, []);
+    }, [walletAddress]);
 
     const getCooldownTimeRemaining = (tokenId: string) => {
         const cooldown = cooldowns.find(c => c.token_id === String(tokenId));
@@ -247,35 +316,35 @@ export default function BearInventory({ nfts, userFaction, walletAddress }: Bear
         return `${hours}h ${minutes}m`;
     };
 
-    const getBearState = (tokenId: string) => {
-        const cooldownActive = isInCooldown(tokenId);
-        const battleActive = isInBattle(tokenId);
-        const onBoard = isBearDeployed(tokenId);
+    const getBearState = (bear: Bear): BearState => {
+        const cooldownActive = isInCooldown(bear.tokenId);
+        const battleActive = isInBattle(bear.tokenId);
+        const onBoard = isBearDeployed(bear.tokenId);
         
         console.log('Bear state check:', {
-            tokenId,
+            tokenId: bear.tokenId,
             cooldownActive,
             battleActive,
             onBoard
         });
 
         if (cooldownActive) {
-            const cooldownTime = getCooldownTimeRemaining(tokenId);
+            const cooldownTime = getCooldownTimeRemaining(bear.tokenId);
             return {
-                status: 'cooldown',
+                status: BearStatus.COOLDOWN,
                 text: `Cooldown: ${cooldownTime}`,
                 color: 'text-yellow-400'
             };
         }
         if (battleActive) {
             return {
-                status: 'battle',
+                status: BearStatus.IN_BATTLE,
                 text: 'In Battle',
                 color: 'text-red-400'
             };
         }
         return {
-            status: 'ready',
+            status: BearStatus.READY,
             text: 'Ready',
             color: 'text-green-400'
         };
@@ -324,21 +393,41 @@ export default function BearInventory({ nfts, userFaction, walletAddress }: Bear
 
     // Process bears with cooldown status
     useEffect(() => {
+        if (loading || !gameState) {
+            console.log('Waiting for game state to load...');
+            return;
+        }
+
         const processBears = () => {
-            const currentTime = Math.floor(Date.now() / 1000);
-            
-            const processedBearsArray = nfts.map(bear => {
+            console.log('Processing bears with game state:', {
+                gameId: gameState.id,
+                squaresCount: gameState.squares?.length,
+                usedBears: gameState.used_bears
+            });
+
+            const processedBearsArray: ProcessedBear[] = nfts.map(bear => {
                 const cooldown = cooldowns.find(c => 
-                    c.token_id === String(bear.tokenId) && 
-                    c.end_time > currentTime
+                    c.token_id === String(bear.tokenId)
                 );
+                const currentTime = Math.floor(Date.now() / 1000);
+                const isInCooldownState = cooldown && cooldown.end_time > currentTime;
+
+                const bearState = getBearState(bear);
+                console.log('Processing bear:', {
+                    tokenId: bear.tokenId,
+                    state: bearState,
+                    cooldownEnd: cooldown?.end_time,
+                    isDeployed: isBearDeployed(bear.tokenId)
+                });
 
                 return {
                     ...bear,
-                    status: cooldown ? 'cooldown' : 'ready',
+                    status: isInCooldownState ? BearStatus.COOLDOWN : 
+                            isBearDeployed(bear.tokenId) ? BearStatus.IN_BATTLE : 
+                            BearStatus.READY,
                     cooldownEnd: cooldown?.end_time,
-                    cooldownRemaining: cooldown
-                        ? getCooldownDetails(String(cooldown.end_time))
+                    cooldownRemaining: cooldown && isInCooldownState
+                        ? getCooldownTimeRemaining(String(cooldown.end_time))
                         : null
                 };
             });
@@ -347,7 +436,7 @@ export default function BearInventory({ nfts, userFaction, walletAddress }: Bear
         };
 
         processBears();
-    }, [nfts, cooldowns]);
+    }, [nfts, cooldowns, gameState, loading]);
 
     useEffect(() => {
         const fetchBearRecords = async () => {
@@ -379,7 +468,7 @@ export default function BearInventory({ nfts, userFaction, walletAddress }: Bear
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {processedBears.map((nft) => {
-                        const bearState = getBearState(nft.tokenId);
+                        const bearState = getBearState(nft);
                         const record = getBearRecord(nft.tokenId);
                         
                         return (

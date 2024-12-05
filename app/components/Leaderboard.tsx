@@ -36,21 +36,36 @@ export default function Leaderboard() {
                         .select('*')
                         .or(`attacker_token_id.eq.${record.token_id},defender_token_id.eq.${record.token_id}`)
                         .order('created_at', { ascending: false })
-                        .limit(1)
-                        .single();
+                        .limit(1);
 
                     if (battleError) {
                         console.warn(`Could not fetch battle data for bear ${record.token_id}:`, battleError);
                         return null;
                     }
 
-                    const isAttacker = battles?.attacker_token_id === record.token_id;
+                    // If no battles found, return basic stats
+                    if (!battles || battles.length === 0) {
+                        return {
+                            tokenId: record.token_id,
+                            name: `Brawler #${record.token_id}`,
+                            image: null,
+                            faction: 'UNKNOWN',
+                            wins: record.wins,
+                            losses: record.losses,
+                            win_rate: record.wins + record.losses > 0 
+                                ? (record.wins / (record.wins + record.losses)) * 100 
+                                : 0
+                        };
+                    }
+
+                    const battle = battles[0];
+                    const isAttacker = battle.attacker_token_id === record.token_id;
                     
                     return {
                         tokenId: record.token_id,
-                        name: isAttacker ? battles?.attacker_name : battles?.defender_name,
-                        image: isAttacker ? battles?.attacker_image : battles?.defender_image,
-                        faction: isAttacker ? battles?.attacker_faction : battles?.defender_faction,
+                        name: isAttacker ? battle.attacker_name : battle.defender_name,
+                        image: isAttacker ? battle.attacker_image : battle.defender_image,
+                        faction: isAttacker ? battle.attacker_faction : battle.defender_faction,
                         wins: record.wins,
                         losses: record.losses,
                         win_rate: record.wins + record.losses > 0 
@@ -134,7 +149,8 @@ export default function Leaderboard() {
                                 bear.faction === 'IRON' ? 'bg-blue-500 text-white' :
                                 bear.faction === 'GEO' ? 'bg-orange-500 text-white' :
                                 bear.faction === 'TECH' ? 'bg-gray-500 text-white' :
-                                'bg-purple-500 text-white'
+                                bear.faction === 'PAW' ? 'bg-purple-500 text-white' :
+                                'bg-gray-700 text-white' // fallback for unknown factions
                             }`}>
                                 {bear.faction}
                             </div>

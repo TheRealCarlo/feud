@@ -22,6 +22,7 @@ interface ProcessedBear {
     status: 'ready' | 'cooldown';
     cooldownEnd?: number;
     cooldownRemaining: string | null;
+    isUsed: boolean;
 }
 
 interface BearSelectorProps {
@@ -82,26 +83,30 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
         }
 
         const processBears = () => {
-            console.log('Processing bears:', { 
-                nftsCount: nfts.length, 
-                cooldownsCount: cooldowns.length,
-                usedBears: initialGameState?.used_bears
-            });
-            
-            // Filter out used bears
+            console.log('Processing mode:', { isBattle, tokenId: '850' });
+
+            // Only filter out used bears if not in battle mode
             const availableNfts = nfts.filter(bear => {
                 const isUsed = initialGameState?.used_bears?.includes(String(bear.tokenId));
+                const inCooldown = cooldowns.find(c => c.token_id === String(bear.tokenId));
+                
                 console.log('Bear filtering:', {
                     tokenId: bear.tokenId,
                     isUsed,
-                    usedBears: initialGameState?.used_bears
+                    isBattle,
+                    inCooldown: !!inCooldown
                 });
-                return !isUsed;
+
+                // In battle mode, show all bears that aren't in cooldown
+                // In deploy mode, only show unused bears
+                return isBattle ? !inCooldown : !isUsed;
             });
 
             // Process each bear with its cooldown status
             const processedBearsArray = availableNfts.map(bear => {
                 const cooldown = cooldowns.find(c => c.token_id === String(bear.tokenId));
+                const isUsed = initialGameState?.used_bears?.includes(String(bear.tokenId));
+                
                 return {
                     ...bear,
                     tokenId: String(bear.tokenId),
@@ -109,7 +114,8 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
                     cooldownEnd: cooldown?.end_time,
                     cooldownRemaining: cooldown
                         ? getCooldownDetails(String(cooldown.end_time))
-                        : null
+                        : null,
+                    isUsed // Add isUsed property for reference
                 };
             });
 
@@ -126,7 +132,7 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
         };
 
         processBears();
-    }, [nfts, cooldowns, walletAddress, initialGameState?.used_bears]);
+    }, [nfts, cooldowns, walletAddress, initialGameState?.used_bears, isBattle]);
 
     const isInCooldown = useCallback((tokenId: string) => {
         const cooldown = cooldowns.find(c => c.token_id === String(tokenId));
@@ -268,6 +274,7 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
                         {processedBears.map((nft) => {
                             const cooldownTime = getCooldownTimeRemaining(nft.tokenId);
                             const inCooldown = isInCooldown(nft.tokenId);
+                            const isUsed = nft.isUsed;
                             
                             return (
                                 <div
@@ -278,8 +285,9 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
                                             ? 'opacity-60 cursor-not-allowed' 
                                             : 'cursor-pointer hover:transform hover:scale-[1.02] hover:shadow-xl'}
                                         transition-all duration-300 ease-out
+                                        ${isUsed && !isBattle ? 'opacity-40' : ''}
                                     `}
-                                    onClick={() => !inCooldown && onSelect(nft)}
+                                    onClick={() => !inCooldown && (isBattle || !isUsed) && onSelect(nft)}
                                 >
                                     {/* Bear Image */}
                                     <div className="aspect-square relative">
@@ -288,20 +296,26 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
                                             alt={nft.metadata.name}
                                             className="w-full h-full object-cover"
                                         />
-                                        {/* Hover Overlay */}
-                                        {!inCooldown && (
+                                        {/* Status Overlays */}
+                                        {!inCooldown && !isUsed && (
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                                 <div className="absolute bottom-4 left-4 text-white font-semibold">
                                                     Click to {isBattle ? 'Battle' : 'Deploy'}
                                                 </div>
                                             </div>
                                         )}
-                                        {/* Cooldown Overlay */}
                                         {inCooldown && (
                                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
                                                 <div className="bg-black/80 px-4 py-2 rounded-lg text-center">
                                                     <p className="text-yellow-400 font-medium">On Cooldown</p>
                                                     <p className="text-white text-sm mt-1">{cooldownTime}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {isUsed && !isBattle && (
+                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
+                                                <div className="bg-black/80 px-4 py-2 rounded-lg text-center">
+                                                    <p className="text-blue-400 font-medium">Deployed</p>
                                                 </div>
                                             </div>
                                         )}
@@ -314,13 +328,13 @@ export function BearSelector({ nfts, onSelect, onClose, gameState: initialGameSt
                                         </h3>
                                         <div className="flex items-center gap-2 mt-2">
                                             <span className="text-gray-400 text-sm">#{nft.tokenId}</span>
-                                            <div className={`
-                                                px-2 py-1 rounded-full text-xs font-medium
-                                                ${nft.metadata.faction === 'IRON' ? 'bg-blue-500/20 text-blue-400' :
-                                                  nft.metadata.faction === 'GEO' ? 'bg-orange-500/20 text-orange-400' :
-                                                  nft.metadata.faction === 'TECH' ? 'bg-gray-500/20 text-gray-400' :
-                                                  'bg-purple-500/20 text-purple-400'}
-                                            `}>
+                                            <div className={`px-3 py-1 rounded-full text-sm ${
+                                                nft.metadata.faction === 'IRON' ? 'bg-blue-500 text-white' :
+                                                nft.metadata.faction === 'GEO' ? 'bg-orange-500 text-white' :
+                                                nft.metadata.faction === 'TECH' ? 'bg-gray-500 text-white' :
+                                                nft.metadata.faction === 'PAW' ? 'bg-purple-500 text-white' :
+                                                'bg-gray-700 text-white' // fallback for unknown factions
+                                            }`}>
                                                 {nft.metadata.faction}
                                             </div>
                                         </div>

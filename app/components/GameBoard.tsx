@@ -7,6 +7,7 @@ import { battleService } from '../services/battleService';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { cleanExpiredCooldowns, getCooldownDetails } from '../utils/cooldownUtils';
+import { BearState, BearStatus, Bear } from '../types/bear';
 
 interface GameBoardProps {
     userFaction: Faction;
@@ -282,9 +283,11 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
                         squares: updatedSquares,
                         used_bears: [...(gameState.used_bears || []), selectedBear.tokenId]
                     })
-                    .eq('id', gameState.id);
+                    .eq('id', gameState.id)
+                    .select();
 
                 if (updateError) {
+                    console.error('Error updating game state:', updateError);
                     throw updateError;
                 }
 
@@ -541,13 +544,43 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
         targetSquareId: number
     ) => {
         try {
-            // First update the bear_records table
+            // Update bear records
             await Promise.all([
                 updateBearRecord(attacker.tokenId, winner === "attacker"),
                 updateBearRecord(defender.tokenId, winner === "defender")
             ]);
 
-            // Then create the battle record
+            if (gameState) {
+                let updatedUsedBears = [...gameState.used_bears];
+                const twoHourCooldown = Math.floor(Date.now() / 1000) + (2 * 60 * 60); // 2 hours
+
+                if (winner === "defender") {
+                    // Attacker loses: remove from used_bears and add cooldown
+                    updatedUsedBears = updatedUsedBears.filter(
+                        bearId => bearId !== attacker.tokenId.toString()
+                    );
+                    await handleCooldown(attacker, twoHourCooldown);
+                } else {
+                    // Defender loses: remove from used_bears and add cooldown
+                    updatedUsedBears = updatedUsedBears.filter(
+                        bearId => bearId !== defender.tokenId.toString()
+                    );
+                    await handleCooldown(defender, twoHourCooldown);
+                }
+
+                // Update game state
+                await supabase
+                    .from('games')
+                    .update({ used_bears: updatedUsedBears })
+                    .eq('id', gameState.id);
+
+                setGameState(prevState => ({
+                    ...prevState!,
+                    used_bears: updatedUsedBears
+                }));
+            }
+
+            // Record battle
             const battleRecord = {
                 attacker_id: walletAddress,
                 attacker_name: attacker.metadata.name,
@@ -562,80 +595,140 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
                 timestamp: new Date().toISOString()
             };
 
-            console.log('Attempting to insert battle record:', battleRecord);
-
-            // Use upsert with onConflict: ignore
-            const { error: battleError } = await supabase
-                .from('battles')
-                .insert([battleRecord])
-                .select()
-                .single();
-
-            if (battleError) {
-                console.error('Battle insert error:', battleError);
-                throw battleError;
-            }
-
-            console.log('Battle recorded successfully');
-
-            // Optionally update cooldowns here if needed
-            try {
-                await handleCooldown(attacker);
-            } catch (cooldownError) {
-                console.error('Cooldown error:', cooldownError);
-                // Don't throw the error as the battle was recorded successfully
-            }
+            await supabase.from('battles').insert([battleRecord]);
 
         } catch (error) {
-            console.error('Error recording battle:', error);
-            if (error instanceof Error) {
-                console.error('Error details:', {
-                    message: error.message,
-                    stack: error.stack
-                });
-            }
+            console.error('Error in battle outcome:', error);
             toast.error('Failed to record battle results');
         }
     };
 
-    const handleCooldown = async (attacker: any) => {
+    const handleCooldown = async (bear: any, endTime: number) => {
         try {
-            const cooldownEnd = Math.floor(Date.now() / 1000) + (60 * 60); // 1 hour cooldown
-            
-            // First check if cooldown already exists
-            const { data: existingCooldown } = await supabase
+            const { error } = await supabase
                 .from('cooldowns')
-                .select('*')
-                .eq('token_id', attacker.tokenId)
-                .eq('wallet_address', walletAddress)
-                .single();
+                .upsert({
+                    token_id: bear.tokenId,
+                    wallet_address: walletAddress,
+                    end_time: endTime
+                });
 
-            if (existingCooldown) {
-                // Update existing cooldown
-                const { error: updateError } = await supabase
-                    .from('cooldowns')
-                    .update({ end_time: cooldownEnd })
-                    .eq('token_id', attacker.tokenId)
-                    .eq('wallet_address', walletAddress);
-
-                if (updateError) throw updateError;
-            } else {
-                // Insert new cooldown
-                const { error: insertError } = await supabase
-                    .from('cooldowns')
-                    .insert({
-                        token_id: attacker.tokenId,
-                        end_time: cooldownEnd,
-                        wallet_address: walletAddress
-                    });
-
-                if (insertError) throw insertError;
-            }
-
-            console.log('Cooldown handled for attacker:', attacker.tokenId);
+            if (error) throw error;
         } catch (error) {
             console.error('Error handling cooldown:', error);
-            // Don't throw error here, just log it
+        }
+    };
+
+    const fetchBattleHistory = async () => {
+        try {
+            const { data: battles, error } = await supabase
+                .from('battles')
+                .select('*')
+                .or(`attacker_id.eq.${walletAddress},defender_id.eq.${walletAddress}`)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Error fetching battle history:', error);
+                return [];
+            }
+
+            return battles || [];
+        } catch (error) {
+            console.error('Error in fetchBattleHistory:', error);
+            return [];
+        }
+    };
+
+    // Update the startNewGame function to also clear battle history
+    const startNewGame = async () => {
+        try {
+            console.log('Starting new game for wallet:', walletAddress);
+            
+            if (!walletAddress) {
+                throw new Error('No wallet address available');
+            }
+
+            // First, check if there's an existing game and its status
+            const { data: existingGame, error: fetchError } = await supabase
+                .from('games')
+                .select('*')
+                .eq('wallet_address', walletAddress)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (fetchError && fetchError.code !== 'PGRST116') {
+                console.error('Error fetching existing game:', fetchError);
+                throw fetchError;
+            }
+
+            // Log existing game state
+            console.log('Existing game:', existingGame);
+
+            // Check if we can start a new game
+            if (existingGame) {
+                const gameEndTime = existingGame.end_time;
+                const currentTime = Math.floor(Date.now() / 1000);
+                
+                console.log('Game timing:', {
+                    gameEndTime,
+                    currentTime,
+                    hasExpired: currentTime > gameEndTime,
+                    timeDiff: (gameEndTime - currentTime) / (60 * 60) // hours remaining
+                });
+
+                if (currentTime <= gameEndTime) {
+                    throw new Error('Current game has not expired yet');
+                }
+            }
+
+            // Create new game with explicit fields
+            const newGameData = {
+                wallet_address: walletAddress,
+                used_bears: [],
+                created_at: new Date().toISOString(),
+                squares: {}, // Assuming squares is a JSON object
+                end_time: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours from now
+                is_active: true
+            };
+
+            console.log('Attempting to create new game with data:', newGameData);
+
+            const { data: newGame, error: createError } = await supabase
+                .from('games')
+                .insert([newGameData])
+                .select()
+                .single();
+
+            if (createError) {
+                console.error('Error creating new game:', createError);
+                throw createError;
+            }
+
+            console.log('New game created successfully:', newGame);
+
+            // Clear any existing cooldowns for this wallet
+            const { error: cooldownError } = await supabase
+                .from('cooldowns')
+                .delete()
+                .eq('wallet_address', walletAddress);
+
+            if (cooldownError) {
+                console.error('Error clearing cooldowns:', cooldownError);
+                // Don't throw error here, continue with game creation
+            }
+
+            // Update game state
+            setGameState(newGame);
+            toast.success('New game started!');
+
+        } catch (error) {
+            console.error('Failed to start new game:', error);
+            if (error instanceof Error) {
+                toast.error(`Failed to start new game: ${error.message}`);
+            } else {
+                toast.error('Failed to start new game');
+            }
         }
     };
 
@@ -693,7 +786,8 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
                                             ${faction === 'IRON' ? 'bg-blue-500' :
                                               faction === 'GEO' ? 'bg-orange-500' :
                                               faction === 'TECH' ? 'bg-gray-500' :
-                                              'bg-purple-500'}
+                                              faction === 'PAW' ? 'bg-purple-500' :
+                                              'bg-gray-700'}
                                         `}
                                         style={{ width: `${percentage}%` }}
                                     />

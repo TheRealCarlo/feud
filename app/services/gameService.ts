@@ -44,81 +44,38 @@ export class GameService {
         return Math.floor(endDate.getTime() / 1000);
     }
 
-    async createNewGame(endTime?: number): Promise<GameState | null> {
-        if (this.isCreatingGame) {
-            console.log('Game creation already in progress');
-            return null;
-        }
-
-        this.isCreatingGame = true;
-
+    async createNewGame(walletAddress: string) {
         try {
-            const { data: existingGames, error: checkError } = await supabase
-                .from('games')
-                .select('*')
-                .eq('is_active', true)
-                .limit(1);
+            console.log('Creating a new game for wallet:', walletAddress);
 
-            if (checkError) {
-                console.error('Error checking existing games:', checkError);
-                return null;
-            }
-
-            if (existingGames && existingGames.length > 0) {
-                console.log('Active game already exists');
-                return existingGames[0] as GameState;
-            }
-
-            const creationDate = new Date();
-            const gameData: GameData = {
-                is_active: true,
+            const newGameData = {
+                wallet_address: walletAddress,
+                used_bears: [],
                 squares: Array(64).fill(null).map((_, index) => ({
                     id: index,
                     bear: null,
                     faction: null
                 })),
-                created_at: creationDate.toISOString(),
-                end_time: endTime || this.calculateEndTime(creationDate),
-                used_bears: []
+                end_time: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours from now
+                is_active: true
             };
 
-            console.log('Attempting to create new game with data:', gameData);
-
-            const { data, error: insertError } = await supabase
+            const { data: newGame, error: createError } = await supabase
                 .from('games')
-                .insert(gameData)
+                .insert([newGameData])
                 .select()
                 .single();
 
-            if (insertError) {
-                console.error('Detailed Supabase error:', {
-                    message: insertError.message,
-                    details: insertError.details,
-                    hint: insertError.hint,
-                    code: insertError.code
-                });
-                throw new Error(`Failed to create game: ${insertError.message}`);
+            if (createError) {
+                console.error('Error creating new game:', createError);
+                throw new Error('Failed to create new game');
             }
 
-            if (!data) {
-                throw new Error('No data returned from game creation');
-            }
-
-            console.log('New game created successfully:', data.id);
-            return data as GameState;
-
+            console.log('New game created successfully:', newGame);
+            return newGame;
         } catch (error) {
-            if (error instanceof Error) {
-                console.error('Error creating new game:', {
-                    message: error.message,
-                    stack: error.stack
-                });
-            } else {
-                console.error('Unknown error creating new game:', error);
-            }
+            console.error('Error in createNewGame:', error);
             throw error;
-        } finally {
-            this.isCreatingGame = false;
         }
     }
 
@@ -228,6 +185,81 @@ export class GameService {
             console.error('Error updating cooldowns:', error);
             throw error;
         }
+    }
+
+    async checkAndRecordExpiredGames() {
+        try {
+            const currentTime = Math.floor(Date.now() / 1000);
+
+            // Fetch active games that have expired
+            const { data: expiredGames, error: fetchError } = await supabase
+                .from('games')
+                .select('*')
+                .eq('is_active', true)
+                .lt('end_time', currentTime);
+
+            if (fetchError) {
+                console.error('Error fetching expired games:', fetchError);
+                return;
+            }
+
+            for (const game of expiredGames) {
+                // Calculate results and store in game_history
+                const factionCounts = this.calculateFactionCounts(game.squares);
+                const winningFaction = this.determineWinningFaction(factionCounts);
+
+                const { error: historyError } = await supabase
+                    .from('game_history')
+                    .insert({
+                        game_id: game.id,
+                        winning_faction: winningFaction,
+                        iron_squares: factionCounts.IRON,
+                        geo_squares: factionCounts.GEO,
+                        tech_squares: factionCounts.TECH,
+                        paw_squares: factionCounts.PAW,
+                        completed_at: new Date().toISOString()
+                    });
+
+                if (historyError) {
+                    console.error('Error storing game history:', historyError);
+                    continue;
+                }
+
+                // Deactivate the game
+                const { error: deactivateError } = await supabase
+                    .from('games')
+                    .update({ is_active: false })
+                    .eq('id', game.id);
+
+                if (deactivateError) {
+                    console.error('Error deactivating game:', deactivateError);
+                }
+            }
+        } catch (error) {
+            console.error('Error in checkAndRecordExpiredGames:', error);
+        }
+    }
+
+    calculateFactionCounts(squares: Square[]) {
+        const factionCounts = { IRON: 0, GEO: 0, TECH: 0, PAW: 0 };
+        squares.forEach(square => {
+            if (square.faction) {
+                factionCounts[square.faction]++;
+            }
+        });
+        return factionCounts;
+    }
+
+    determineWinningFaction(factionCounts: Record<Faction, number>) {
+        let winningFaction: Faction | null = null;
+        let maxCount = 0;
+        for (const [faction, count] of Object.entries(factionCounts)) {
+            if (count > maxCount) {
+                maxCount = count;
+                winningFaction = faction as Faction;
+            }
+        }
+        return winningFaction;
     }
 }
 
