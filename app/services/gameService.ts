@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { Faction, GameState } from '../types/game';
+import { Faction, GameState, Square } from '../types/game';
 
 interface GameData {
     id?: string;
