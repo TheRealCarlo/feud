@@ -25,6 +25,23 @@ interface GameHistory {
     completed_at: string;
 }
 
+interface BattleRecord {
+    id?: string;
+    attacker_id: string;
+    attacker_name: string;
+    attacker_image?: string;
+    attacker_faction: Faction;
+    defender_id: string;
+    defender_name: string;
+    defender_image?: string;
+    defender_faction: Faction;
+    winner: 'attacker' | 'defender';
+    timestamp?: string;
+    created_at?: string;
+    attacker_token_id: string;
+    defender_token_id: string;
+}
+
 export class GameService {
     private static instance: GameService;
     private isCreatingGame: boolean = false;
@@ -308,6 +325,45 @@ export class GameService {
         } catch (error) {
             console.error('Error completing game:', error);
             return false;
+        }
+    }
+
+    async recordBattle(
+        attacker: Bear,
+        defender: Bear,
+        winner: 'attacker' | 'defender'
+    ): Promise<void> {
+        try {
+            const battleRecord: BattleRecord = {
+                attacker_id: attacker.tokenId,
+                attacker_name: attacker.metadata.name,
+                attacker_image: attacker.metadata.image,
+                attacker_faction: attacker.metadata.faction,
+                attacker_token_id: attacker.tokenId,
+                
+                defender_id: defender.tokenId,
+                defender_name: defender.metadata.name,
+                defender_image: defender.metadata.image,
+                defender_faction: defender.metadata.faction,
+                defender_token_id: defender.tokenId,
+                
+                winner,
+                timestamp: new Date().toISOString(),
+            };
+
+            const { error } = await supabase
+                .from('battles')
+                .insert(battleRecord);
+
+            if (error) {
+                console.error('Error recording battle:', error);
+                throw error;
+            }
+
+            console.log('Battle recorded successfully:', battleRecord);
+        } catch (error) {
+            console.error('Error in recordBattle:', error);
+            throw error;
         }
     }
 }

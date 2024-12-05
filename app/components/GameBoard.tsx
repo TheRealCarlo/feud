@@ -353,12 +353,11 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
 
                     toast.dismiss(battleToast);
                     
-                    // Record battle outcome with "attacker" or "defender"
-                    await handleBattleOutcome(
+                    // Record battle outcome
+                    await gameService.recordBattle(
                         attacker,
                         defender,
-                        attackerWins ? "attacker" : "defender",
-                        selectedSquareId
+                        attackerWins ? 'attacker' : 'defender'
                     );
                     
                     if (attackerWins) {
