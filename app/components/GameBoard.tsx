@@ -38,6 +38,8 @@ const getFactionColor = (faction: Faction): string => {
     }
 };
 
+const TWO_HOUR_COOLDOWN = Math.floor(Date.now() / 1000) + (2 * 60 * 60); // 2 hours from now
+
 const GameBoard: React.FC<GameBoardProps> = React.memo(({ 
     userFaction, 
     nfts, 
@@ -393,7 +395,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
                     } else {
                         // Handle defeat logic
                         toast.error('Defeat! Better luck next time!');
-                        await handleCooldown(attacker);
+                        await handleCooldown(attacker, TWO_HOUR_COOLDOWN);
                     }
                 } catch (battleError) {
                     console.error('Battle error:', battleError);
