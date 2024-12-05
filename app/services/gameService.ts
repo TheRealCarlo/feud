@@ -44,38 +44,35 @@ export class GameService {
         return Math.floor(endDate.getTime() / 1000);
     }
 
-    async createNewGame(walletAddress: string) {
+    async createNewGame(endTime: number): Promise<GameState | null> {
         try {
-            console.log('Creating a new game for wallet:', walletAddress);
-
             const newGameData = {
-                wallet_address: walletAddress,
-                used_bears: [],
                 squares: Array(64).fill(null).map((_, index) => ({
                     id: index,
                     bear: null,
                     faction: null
                 })),
-                end_time: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours from now
-                is_active: true
+                used_bears: [],
+                is_active: true,
+                end_time: endTime.toString(), // Convert to string for database
+                cooldowns: []
             };
 
-            const { data: newGame, error: createError } = await supabase
+            const { data: newGame, error } = await supabase
                 .from('games')
                 .insert([newGameData])
                 .select()
                 .single();
 
-            if (createError) {
-                console.error('Error creating new game:', createError);
-                throw new Error('Failed to create new game');
+            if (error) {
+                console.error('Error creating new game:', error);
+                return null;
             }
 
-            console.log('New game created successfully:', newGame);
             return newGame;
         } catch (error) {
             console.error('Error in createNewGame:', error);
-            throw error;
+            return null;
         }
     }
 
