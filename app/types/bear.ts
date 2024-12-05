@@ -1,3 +1,5 @@
+import { Faction } from './game';
+
 export enum BearStatus {
     READY = 'ready',
     COOLDOWN = 'cooldown',
