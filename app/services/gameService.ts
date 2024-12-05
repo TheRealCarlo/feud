@@ -54,7 +54,7 @@ export class GameService {
                 })),
                 used_bears: [],
                 is_active: true,
-                end_time: endTime.toString(), // Convert to string for database
+                end_time: endTime,
                 cooldowns: []
             };
 

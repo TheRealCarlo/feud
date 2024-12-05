@@ -111,7 +111,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
             if (!currentGame) {
                 try {
                     const endTime = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
-                    currentGame = await gameService.createNewGame(endTime.toString());
+                    currentGame = await gameService.createNewGame(endTime);
                     if (!currentGame) {
                         toast.error('Failed to create new game');
                         return;
@@ -440,7 +440,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
 
             // Create new game with new end time
             const endTime = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
-            const newGame = await gameService.createNewGame(endTime.toString());
+            const newGame = await gameService.createNewGame(endTime);
             
             if (newGame) {
                 setGameState(newGame);
