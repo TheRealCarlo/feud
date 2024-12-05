@@ -258,6 +258,56 @@ export class GameService {
         }
         return winningFaction;
     }
+
+    async completeGame(gameState: GameState) {
+        try {
+            // Calculate results
+            const factionCounts = this.calculateFactionCounts(gameState.squares);
+            const winningFaction = this.determineWinningFaction(factionCounts);
+
+            if (winningFaction) {
+                // Record game history
+                const { error: historyError } = await supabase
+                    .from('game_history')
+                    .insert({
+                        game_id: gameState.id,
+                        winning_faction: winningFaction,
+                        iron_squares: factionCounts.IRON,
+                        geo_squares: factionCounts.GEO,
+                        tech_squares: factionCounts.TECH,
+                        paw_squares: factionCounts.PAW,
+                        completed_at: new Date().toISOString()
+                    });
+
+                if (historyError) {
+                    console.error('Error recording game history:', historyError);
+                    return false;
+                }
+
+                // Deactivate current game
+                const { error: deactivateError } = await supabase
+                    .from('games')
+                    .update({ is_active: false })
+                    .eq('id', gameState.id);
+
+                // Create new game with 24-hour duration
+                const newEndTime = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+                await this.createNewGame(newEndTime);
+
+                console.log('Game completed:', {
+                    winner: winningFaction,
+                    scores: factionCounts
+                });
+
+                return true;
+            }
+
+            return false;
+        } catch (error) {
+            console.error('Error completing game:', error);
+            return false;
+        }
+    }
 }
 
 export const gameService = GameService.getInstance(); 
