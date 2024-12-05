@@ -113,7 +113,9 @@ export class GameService {
                         .update({ is_active: false })
                         .eq('id', gameState.id);
 
-                    await this.createNewGame();
+                    // Create new game with 24-hour duration
+                    const newEndTime = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+                    await this.createNewGame(newEndTime);
 
                     console.log('Game completed:', {
                         winner: winningFaction,
