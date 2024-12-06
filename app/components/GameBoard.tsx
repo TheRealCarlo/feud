@@ -742,6 +742,17 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(({
                     <p className="text-xl font-bold text-yellow-400">{formatTime(timeRemaining)}</p>
                 </div>
 
+                {/* Instructions Box - New Addition */}
+                <div className="mb-6 bg-gray-700/50 rounded-lg p-4">
+                    <h2 className="text-xl font-semibold mb-3 text-white">Welcome to Faction Feud</h2>
+                    <div className="space-y-2 text-gray-300 text-sm">
+                        <p>Work together to capture NeoCity Town Square.</p>
+                        <p>You can choose an empty square to deploy a bear or attack a rival faction bear by choosing an occupied square.</p>
+                        <p>The faction with the most territory when time is up, Wins!</p>
+                        <p className="text-yellow-400">⚠️ If you lose a battle, your bear will enter into a 2 Hour Cooldown.</p>
+                    </div>
+                </div>
+
                 {/* Territory Stats */}
                 <div className="mb-6 text-center">
                     <h2 className="text-2xl font-bold text-white mb-2">Capture Town Square</h2>
